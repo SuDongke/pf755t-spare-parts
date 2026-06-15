@@ -1,0 +1,2616 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AB低压变频器使用助手</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-blue: #1e40af;
+            --primary-blue-light: #3b82f6;
+            --secondary-gray: #64748b;
+            --industrial-bg: #f1f5f9;
+            --industrial-dark: #1e293b;
+            --accent-orange: #f97316;
+            --sidebar-width: 260px;
+        }
+        
+        body {
+            font-family: 'Segoe UI', 'Microsoft YaHei', sans-serif;
+            background: linear-gradient(135deg, #f0f4f8 0%, #e2e8f0 100%);
+        }
+        
+        .sidebar {
+            background: linear-gradient(180deg, var(--industrial-dark) 0%, #334155 100%);
+            overflow-y: auto;
+            height: 100%;
+            width: var(--sidebar-width);
+            min-width: 180px;
+            max-width: 420px;
+            flex-shrink: 0;
+            transition: width 0.05s ease;
+        }
+        
+        /* 拖拽调节条 */
+        .resize-handle {
+            width: 5px;
+            cursor: col-resize;
+            background: transparent;
+            position: relative;
+            flex-shrink: 0;
+            z-index: 25;
+            transition: background 0.2s;
+        }
+        .resize-handle:hover,
+        .resize-handle.active {
+            background: var(--accent-orange);
+        }
+        .resize-handle::after {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            width: 3px;
+            height: 40px;
+            border-radius: 2px;
+            background: rgba(255,255,255,0.15);
+        }
+        .resize-handle:hover::after,
+        .resize-handle.active::after {
+            background: rgba(255,255,255,0.5);
+        }
+        
+        
+        .main-content {
+            min-width: 0;
+            overflow-x: auto;
+        }
+
+        /* 响应式适配 */
+        @media (max-width: 1024px) {
+            :root {
+                --sidebar-width: 220px;
+            }
+        }
+        @media (max-width: 768px) {
+            .sidebar {
+                position: fixed;
+                left: 0;
+                top: 0;
+                z-index: 30;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease;
+                width: 280px;
+            }
+            .sidebar.open {
+                transform: translateX(0);
+            }
+            .resize-handle {
+                display: none;
+            }
+            .mobile-overlay {
+                display: none;
+                position: fixed;
+                inset: 0;
+                background: rgba(0,0,0,0.5);
+                z-index: 29;
+            }
+            .mobile-overlay.active {
+                display: block;
+            }
+            .mobile-toggle {
+                display: flex !important;
+            }
+            .main-content {
+                margin-left: 0 !important;
+            }
+        }
+        @media (min-width: 769px) {
+            .mobile-toggle {
+                display: none !important;
+            }
+            .mobile-overlay {
+                display: none !important;
+            }
+        }
+        
+        .sidebar::-webkit-scrollbar {
+            width: 4px;
+        }
+        .sidebar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(255,255,255,0.2);
+            border-radius: 2px;
+        }
+        .sidebar::-webkit-scrollbar-thumb:hover {
+            background: rgba(255,255,255,0.4);
+        }
+        
+        .sidebar-item {
+            transition: all 0.3s ease;
+        }
+        
+        .sidebar-item:hover {
+            background: rgba(255,255,255,0.1);
+        }
+        
+        .sidebar-item.active {
+            background: var(--primary-blue);
+            border-left: 4px solid var(--accent-orange);
+        }
+        
+        .category-toggle {
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .category-children {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .category-children.open {
+            max-height: 600px;
+        }
+        
+        .level2-children {
+            max-height: 0;
+            overflow: hidden;
+            transition: max-height 0.3s ease;
+        }
+        
+        .level2-children.open {
+            max-height: 400px;
+        }
+        
+        .toggle-arrow {
+            transition: transform 0.3s ease;
+            display: inline-block;
+            font-size: 10px;
+        }
+        
+        .toggle-arrow.rotated {
+            transform: rotate(90deg);
+        }
+        
+        .frame-sub-item {
+            padding: 4px 16px 4px 36px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #cbd5e1;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .frame-sub-item:hover {
+            background: rgba(255,255,255,0.08);
+            color: #fff;
+        }
+        
+        .frame-sub-item.active {
+            background: rgba(59,130,246,0.3);
+            color: #93c5fd;
+            border-left: 3px solid #3b82f6;
+        }
+        
+        .category-toggle-level2 {
+            padding: 5px 16px 5px 28px;
+            border-radius: 4px;
+            font-size: 13px;
+            color: #a5b4fc;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+        }
+        
+        .category-toggle-level2:hover {
+            background: rgba(255,255,255,0.08);
+            color: #e0e7ff;
+        }
+        
+        .category-toggle-level2.active {
+            background: rgba(99,102,241,0.3);
+            color: #c7d2fe;
+            border-left: 3px solid #6366f1;
+        }
+        
+        .level2-frame-item {
+            padding: 3px 16px 3px 48px;
+            border-radius: 4px;
+            font-size: 12px;
+            color: #94a3b8;
+            cursor: pointer;
+            transition: all 0.2s;
+        }
+        
+        .level2-frame-item:hover {
+            background: rgba(255,255,255,0.06);
+            color: #e2e8f0;
+        }
+        
+        .level2-frame-item.active {
+            background: rgba(99,102,241,0.25);
+            color: #a5b4fc;
+            border-left: 2px solid #818cf8;
+        }
+        
+        .search-box {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+        
+        .data-table {
+            background: white;
+            border-radius: 8px;
+            overflow: hidden;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        
+        .data-table th {
+            background: linear-gradient(135deg, var(--primary-blue) 0%, var(--primary-blue-light) 100%);
+            color: white;
+            font-weight: 600;
+            position: sticky;
+            top: 0;
+            z-index: 10;
+            cursor: pointer;
+            user-select: none;
+        }
+        
+        .data-table th:hover {
+            background: var(--primary-blue-light);
+        }
+        
+        .data-table tbody tr {
+            transition: background-color 0.2s;
+        }
+        
+        .data-table tbody tr:hover {
+            background-color: #f1f5f9;
+        }
+        
+        .data-table tbody tr:nth-child(even) {
+            background-color: #fafafa;
+        }
+        
+        .frame-tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 12px;
+            font-size: 12px;
+            font-weight: 500;
+            margin: 2px;
+            background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%);
+            color: var(--primary-blue);
+            border: 1px solid #93c5fd;
+        }
+        
+        .category-badge {
+            padding: 4px 12px;
+            border-radius: 16px;
+            font-size: 11px;
+            font-weight: 600;
+        }
+        
+        .badge-ts {
+            background: linear-gradient(135deg, #dcfce7 0%, #bbf7d0 100%);
+            color: #166534;
+            border: 1px solid #86efac;
+        }
+        
+        .badge-tltr {
+            background: linear-gradient(135deg, #fef3c7 0%, #fde68a 100%);
+            color: #92400e;
+            border: 1px solid #fcd34d;
+        }
+        
+        .badge-tr {
+            background: linear-gradient(135deg, #e0e7ff 0%, #c7d2fe 100%);
+            color: #3730a3;
+            border: 1px solid #a5b4fc;
+        }
+        
+        .badge-tltm {
+            background: linear-gradient(135deg, #fae8ff 0%, #e9d5ff 100%);
+            color: #6b21a8;
+            border: 1px solid #d8b4fe;
+        }
+        
+        .badge-other {
+            background: linear-gradient(135deg, #f3f4f6 0%, #e5e7eb 100%);
+            color: #374151;
+            border: 1px solid #d1d5db;
+        }
+        
+        .pagination-btn {
+            padding: 8px 16px;
+            border-radius: 6px;
+            transition: all 0.2s;
+        }
+        
+        .pagination-btn:hover:not(:disabled) {
+            background: var(--primary-blue);
+            color: white;
+        }
+        
+        .pagination-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .pagination-btn.active {
+            background: var(--primary-blue);
+            color: white;
+        }
+        
+        .modal-overlay {
+            background: rgba(0, 0, 0, 0.5);
+            backdrop-filter: blur(4px);
+        }
+        
+        .modal-content {
+            animation: slideIn 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateY(-20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .editable-cell {
+            cursor: pointer;
+            padding: 4px 8px;
+            border-radius: 4px;
+            transition: background-color 0.2s;
+        }
+        
+        .editable-cell:hover {
+            background-color: #fef08a;
+        }
+        
+        .thumbnail {
+            width: 40px;
+            height: 40px;
+            object-fit: cover;
+            border-radius: 4px;
+            border: 1px solid #e5e7eb;
+            cursor: pointer;
+        }
+        
+        .thumbnail:hover {
+            transform: scale(1.5);
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+        }
+        
+        .toast {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            padding: 12px 24px;
+            border-radius: 8px;
+            color: white;
+            font-weight: 500;
+            z-index: 1000;
+            animation: slideUp 0.3s ease;
+        }
+        
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        
+        .sort-icon {
+            margin-left: 4px;
+            opacity: 0.5;
+        }
+        
+        .sort-icon.active {
+            opacity: 1;
+            color: #fbbf24;
+        }
+        
+        .batch-input {
+            min-height: 120px;
+            resize: vertical;
+        }
+        
+        .stats-card {
+            background: linear-gradient(135deg, #ffffff 0%, #f8fafc 100%);
+            border-left: 4px solid var(--primary-blue);
+        }
+        
+        .clear-btn {
+            position: absolute;
+            right: 10px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            color: #9ca3af;
+            cursor: pointer;
+        }
+        
+        .clear-btn:hover {
+            color: #ef4444;
+        }
+        
+        /* 登录相关样式 */
+        .auth-btn {
+            transition: all 0.3s ease;
+        }
+        .auth-btn.logged-in {
+            background: rgba(34,197,94,0.2);
+            border: 1px solid rgba(34,197,94,0.4);
+        }
+        .auth-btn.logged-out {
+            background: rgba(59,130,246,0.2);
+            border: 1px solid rgba(59,130,246,0.4);
+        }
+        .login-overlay {
+            background: rgba(0,0,0,0.5);
+            backdrop-filter: blur(4px);
+        }
+        .edit-disabled {
+            opacity: 0.4;
+            pointer-events: none;
+            cursor: not-allowed;
+        }
+        .btn-disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+    
+    /* 顶部导航栏 */
+    .top-nav {
+        background: linear-gradient(90deg, #1e293b 0%, #334155 100%);
+        height: 56px;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0 20px;
+        flex-shrink: 0;
+        z-index: 35;
+    }
+    .top-tab {
+        padding: 10px 28px;
+        border-radius: 10px;
+        border: none;
+        cursor: pointer;
+        font-size: 17px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        transition: all 0.2s;
+        background: transparent;
+        color: #94a3b8;
+        margin: 0 6px;
+    }
+    .top-tab.active {
+        background: #3b82f6;
+        color: #fff;
+        box-shadow: 0 2px 8px rgba(59,130,246,0.3);
+    }
+    .top-tab:hover:not(.active) {
+        background: rgba(59,130,246,0.15);
+        color: #e2e8f0;
+    }
+
+    .ex-card{background:#fff;border-radius:10px;padding:14px;cursor:pointer;box-shadow:0 1px 3px rgba(0,0,0,0.1);transition:all 0.2s;border:1px solid #e2e8f0;}
+    .ex-card:hover{border-color:#3b82f6;box-shadow:0 2px 8px rgba(59,130,246,0.15);transform:translateY(-1px);}
+    .ex-label{font-size:12px;color:#3b82f6;margin-bottom:4px;}
+    .ex-text{font-size:13px;color:#334155;}
+    .chat-msg{margin:8px 0;display:flex;}
+    .chat-msg.user{justify-content:flex-end;}
+    .chat-msg.bot{justify-content:flex-start;}
+    .chat-bbl{max-width:75%;padding:12px 16px;border-radius:12px;font-size:14px;line-height:1.7;white-space:pre-wrap;word-break:break-word;}
+    .chat-bbl.bot{background:#e0edff;color:#1e293b;border-bottom-left-radius:4px;}
+    .chat-bbl.user{background:#3b82f6;color:#fff;border-bottom-right-radius:4px;}
+    .cat-tag{display:inline-block;font-size:11px;padding:2px 8px;border-radius:4px;margin-right:6px;margin-bottom:4px;font-weight:600;}
+    .cat-tag.F{background:#fef3c7;color:#92400e;}
+    .cat-tag.P{background:#dbeafe;color:#1e40af;}
+    .cat-tag.M{background:#d1fae5;color:#065f46;}
+    .cat-tag.R{background:#fce7f3;color:#9d174d;}
+    .cat-tag.G{background:#f3e8ff;color:#6b21a8;}
+    .ch-item{padding:8px 10px;border-radius:6px;cursor:pointer;font-size:13px;color:#cbd5e1;margin-bottom:4px;transition:all 0.2s;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+    .ch-item:hover{background:rgba(59,130,246,0.15);color:#f8fafc;}
+    .ch-item.active{background:rgba(59,130,246,0.25);color:#f8fafc;}
+    @media(max-width:768px){#chatSidebar{display:none;}}
+</style>
+</head>
+<body style="margin:0;padding:0;height:100vh;overflow:hidden;">
+    <div style="display:flex;flex-direction:column;height:100vh;width:100vw;overflow:hidden;" id="appContainer">
+    <!-- 顶部导航栏 -->
+    <nav class="top-nav">
+        <div style="display:flex;gap:8px;">
+            <button class="top-tab active" onclick="switchTab('chat')" id="tab-chat">💬 调试经验分享</button>
+            <button class="top-tab" onclick="switchTab('parts')" id="tab-parts">🔧 备件查询</button>
+        </div>
+    </nav>
+    <div id="partsSection" style="display:none;flex:1;min-height:0;overflow:hidden;height:0;">
+        <!-- 移动端菜单按钮 -->
+        <button class="mobile-toggle fixed top-3 left-3 z-40 bg-gray-800 text-white w-10 h-10 rounded-lg items-center justify-center shadow-lg" onclick="toggleMobileSidebar()" style="display:none;">
+            <i class="fas fa-bars"></i>
+        </button>
+        <!-- 移动端遮罩 -->
+        <div class="mobile-overlay" id="mobileOverlay" onclick="toggleMobileSidebar()"></div>
+        <!-- 左侧分类导航 -->
+        <aside class="sidebar text-white p-4 z-20">
+            <div class="mb-6 pb-4 border-b border-gray-600">
+                <h1 class="text-xl font-bold flex items-center gap-2" id="sidebarTitle">
+                    <i class="fas fa-cogs text-orange-400" id="sidebarIcon"></i>
+                    <span id="sidebarTitleText">备件查询</span>
+                </h1>
+            </div>
+            
+            <nav class="space-y-1" id="main-nav">
+                <div class="text-xs uppercase text-gray-500 mb-2 px-2">产品分类</div>
+                <a href="#" class="sidebar-item active block px-4 py-2 rounded-lg" data-category="all">
+                    <i class="fas fa-th-large mr-2"></i>全部备件
+                    <span class="float-right text-xs bg-gray-600 px-2 py-0.5 rounded-full" id="count-all">0</span>
+                </a>
+                <!-- PF755TS -->
+                <div class="category-group" data-group="PF755TS">
+                    <a href="#" class="sidebar-item block px-4 py-2 rounded-lg category-toggle" data-category="PF755TS">
+                        <i class="fas fa-chevron-right toggle-arrow mr-1.5"></i>
+                        <i class="fas fa-microchip mr-2"></i>PF755TS
+                        <span class="float-right text-xs bg-blue-600 px-2 py-0.5 rounded-full" id="count-PF755TS">0</span>
+                    </a>
+                    <div class="category-children" id="children-PF755TS"></div>
+                </div>
+                <!-- PF755TL -->
+                <div class="category-group" data-group="PF755TL">
+                    <a href="#" class="sidebar-item block px-4 py-2 rounded-lg category-toggle" data-category="PF755TL">
+                        <i class="fas fa-chevron-right toggle-arrow mr-1.5"></i>
+                        <i class="fas fa-server mr-2"></i>PF755TL
+                        <span class="float-right text-xs bg-blue-600 px-2 py-0.5 rounded-full" id="count-PF755TL">0</span>
+                    </a>
+                    <div class="category-children" id="children-PF755TL"></div>
+                </div>
+                <!-- PF755TR -->
+                <div class="category-group" data-group="PF755TR">
+                    <a href="#" class="sidebar-item block px-4 py-2 rounded-lg category-toggle" data-category="PF755TR">
+                        <i class="fas fa-chevron-right toggle-arrow mr-1.5"></i>
+                        <i class="fas fa-sync mr-2"></i>PF755TR
+                        <span class="float-right text-xs bg-blue-600 px-2 py-0.5 rounded-full" id="count-PF755TR">0</span>
+                    </a>
+                    <div class="category-children" id="children-PF755TR"></div>
+                </div>
+                <!-- PF755TM (two-level: CBI + BusSupply) -->
+                <div class="category-group" data-group="PF755TM">
+                    <a href="#" class="sidebar-item block px-4 py-2 rounded-lg category-toggle" data-category="PF755TM">
+                        <i class="fas fa-chevron-right toggle-arrow mr-1.5"></i>
+                        <i class="fas fa-bolt mr-2"></i>PF755TM
+                        <span class="float-right text-xs bg-blue-600 px-2 py-0.5 rounded-full" id="count-PF755TM">0</span>
+                    </a>
+                    <div class="category-children" id="children-PF755TM">
+                        <div class="tm-subgroup">
+                            <div class="frame-sub-item category-toggle-level2" data-category="PF755TM-CBI" style="padding-left:28px;font-weight:500;">
+                                <i class="fas fa-chevron-right toggle-arrow mr-1" style="font-size:8px;"></i>
+                                <i class="fas fa-plug mr-1.5" style="font-size:11px;"></i>Common Bus Inverters
+                                <span class="float-right text-xs bg-indigo-600 px-1.5 py-0.5 rounded-full" id="count-PF755TM-CBI">0</span>
+                            </div>
+                            <div class="category-children level2-children" id="children-PF755TM-CBI"></div>
+                        </div>
+                        <div class="tm-subgroup">
+                            <div class="frame-sub-item category-toggle-level2" data-category="PF755TM-BusSupply" style="padding-left:28px;font-weight:500;">
+                                <i class="fas fa-chevron-right toggle-arrow mr-1" style="font-size:8px;"></i>
+                                <i class="fas fa-car-battery mr-1.5" style="font-size:11px;"></i>Bus Supply
+                                <span class="float-right text-xs bg-indigo-600 px-1.5 py-0.5 rounded-full" id="count-PF755TM-BusSupply">0</span>
+                            </div>
+                            <div class="category-children level2-children" id="children-PF755TM-BusSupply"></div>
+                        </div>
+                    </div>
+                </div>
+                <!-- 其他 -->
+                <div class="category-group" data-group="其他">
+                    <a href="#" class="sidebar-item block px-4 py-2 rounded-lg category-toggle" data-category="其他">
+                        <i class="fas fa-chevron-right toggle-arrow mr-1.5"></i>
+                        <i class="fas fa-box mr-2"></i>其他
+                        <span class="float-right text-xs bg-gray-600 px-2 py-0.5 rounded-full" id="count-其他">0</span>
+                    </a>
+                    <div class="category-children" id="children-其他"></div>
+                </div>
+            </nav>
+            
+            <div class="mt-8 pt-4 border-t border-gray-600">
+                <div class="text-xs uppercase text-gray-500 mb-2 px-2">数据统计</div>
+                <div class="stats-card p-3 rounded-lg">
+                    <div class="text-2xl font-bold text-blue-600" id="total-count">0</div>
+                    <div class="text-xs text-gray-500">总备件数</div>
+                </div>
+                
+                <!-- 登录按钮 -->
+                <div class="mt-4">
+                    <button id="auth-btn" class="auth-btn logged-out w-full px-3 py-2 rounded-lg text-sm flex items-center justify-center gap-2 text-white" onclick="handleAuthClick()">
+                        <i class="fas fa-lock" id="auth-icon"></i>
+                        <span id="auth-text">管理员登录</span>
+                    </button>
+                </div>
+            </div>
+        </aside>
+        
+        <!-- 拖拽调节条 -->
+        <div class="resize-handle" id="resizeHandle"></div>
+        
+        <!-- 主内容区 -->
+        <main class="main-content flex-1 p-6">
+            <!-- 顶部搜索栏 -->
+            <div class="search-box rounded-xl p-4 mb-6">
+                <div class="flex flex-wrap gap-4 items-center">
+                    <div class="flex-1 min-w-[300px]">
+                        <div class="relative">
+                            <i class="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-gray-400"></i>
+                            <input type="text" id="search-input" placeholder="搜索备件名称或目录号..." 
+                                   class="w-full pl-10 pr-10 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500">
+                            <button class="clear-btn" onclick="clearSearch()" title="清除搜索">
+                                <i class="fas fa-times"></i>
+                            </button>
+                        </div>
+                    </div>
+                    
+                    <div class="flex gap-2">
+                        <button onclick="openBatchModal()" class="px-4 py-2 bg-purple-600 text-white rounded-lg hover:bg-purple-700 transition flex items-center gap-2">
+                            <i class="fas fa-list"></i>批量查询
+                        </button>
+                        <button onclick="exportFilteredData()" class="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition flex items-center gap-2">
+                            <i class="fas fa-file-excel"></i>导出Excel
+                        </button>
+                        <button onclick="openImportModal()" class="btn-auth-required px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition flex items-center gap-2">
+                            <i class="fas fa-file-import"></i>导入数据
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="flex flex-wrap gap-4 mt-4 items-center">
+                    <div class="flex items-center gap-2">
+                        <label class="text-sm text-gray-600">每页显示:</label>
+                        <select id="page-size" onchange="changePageSize()" class="border border-gray-300 rounded px-3 py-1">
+                            <option value="20">20条</option>
+                            <option value="50">50条</option>
+                            <option value="100" selected>100条</option>
+                            <option value="200">200条</option>
+                        </select>
+                    </div>
+                    
+                    <div class="flex-1"></div>
+                    
+                    <div class="text-sm text-gray-500">
+                        当前筛选: <span id="current-filter" class="font-medium text-blue-600">全部</span>
+                        | 显示 <span id="displayed-count">0</span> / <span id="filtered-count">0</span> 条
+                    </div>
+                </div>
+            </div>
+            
+            <!-- 数据表格 -->
+            <div class="data-table overflow-x-auto">
+                <table class="w-full">
+                    <thead>
+                        <tr>
+                            <th class="px-3 py-3 text-left w-12" onclick="sortTable('id')">
+                                序号 <i class="fas fa-sort sort-icon" id="sort-id"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left min-w-[180px]" onclick="sortTable('kitCatalogNumber')">
+                                目录号(标准) <i class="fas fa-sort sort-icon" id="sort-kitCatalogNumber"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left min-w-[180px]" onclick="sortTable('kitCatalogNumberXT')">
+                                目录号(XT版) <i class="fas fa-sort sort-icon" id="sort-kitCatalogNumberXT"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left min-w-[250px]" onclick="sortTable('descriptionCN')">
+                                中文名称 <i class="fas fa-sort sort-icon" id="sort-descriptionCN"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left min-w-[200px]" onclick="sortTable('description')">
+                                英文名称 <i class="fas fa-sort sort-icon" id="sort-description"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left w-[120px]" onclick="sortTable('frameSize')">
+                                适用Frame <i class="fas fa-sort sort-icon" id="sort-frameSize"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left w-[150px]" onclick="sortTable('enclosureType')">
+                                外壳类型 <i class="fas fa-sort sort-icon" id="sort-enclosureType"></i>
+                            </th>
+                            <th class="px-3 py-3 text-left w-[150px]">分类</th>
+                            <th class="px-3 py-3 text-left w-[250px]">备注</th>
+                            <th class="px-3 py-3 text-center w-[100px]">图片</th>
+                            <th class="px-3 py-3 text-center w-[100px]">操作</th>
+                        </tr>
+                    </thead>
+                    <tbody id="table-body">
+                        <!-- 数据行将动态生成 -->
+                    </tbody>
+                </table>
+            </div>
+            
+            <!-- 分页控件 -->
+            <div class="flex justify-center items-center gap-2 mt-6" id="pagination">
+                <!-- 分页按钮将动态生成 -->
+            </div>
+        </main>
+    </div><!-- /partsSection -->
+    
+    <!-- 调试经验分享区域 -->
+    <div id="chatSection" style="display:flex;flex:1;min-height:0;position:relative;overflow:hidden;height:0;">
+        <div style="display:flex;height:100%;min-height:0;width:100%;">
+            <aside id="chatSidebar" style="width:240px;min-width:180px;max-width:320px;background:linear-gradient(180deg,#1e293b 0%,#334155 100%);color:#f8fafc;padding:16px;display:flex;flex-direction:column;flex-shrink:0;overflow-y:auto;">
+                <div style="margin-bottom:16px;padding-bottom:12px;border-bottom:1px solid #475569;">
+                    <h2 style="font-size:18px;font-weight:700;display:flex;align-items:center;gap:8px;" id="chatSidebarTitle">
+                        <i class="fas fa-tools" style="color:#3b82f6;"></i>
+                        <span id="chatSidebarTitleText">调试经验分享</span>
+                    </h2>
+                </div>
+                <div style="border-top:1px solid #475569;padding-top:12px;margin-top:auto;">
+                    <a href="https://support.rockwellautomation.com/" target="_blank" rel="noopener" style="display:block;width:100%;padding:8px;border:none;border-radius:6px;background:rgba(234,88,12,0.15);color:#fb923c;cursor:pointer;font-size:13px;margin-bottom:8px;text-decoration:none;text-align:center;box-sizing:border-box;"><i class="fas fa-external-link-alt" style="margin-right:4px;"></i>AB官方知识库</a>
+                    <a href="https://advisor.rockwellautomation.com/familysearch/Drives" target="_blank" rel="noopener" style="display:block;width:100%;padding:8px;border:none;border-radius:6px;background:rgba(16,185,129,0.15);color:#34d399;cursor:pointer;font-size:13px;margin-bottom:8px;text-decoration:none;text-align:center;box-sizing:border-box;"><i class="fas fa-calculator" style="margin-right:4px;"></i>AB变频选型工具</a>
+                    <a href="https://www.rockwellautomation.com/en-us/support/documentation/literature-library.html" target="_blank" rel="noopener" onclick="showLitGuide()" style="display:block;width:100%;padding:8px;border:none;border-radius:6px;background:rgba(139,92,246,0.15);color:#a78bfa;cursor:pointer;font-size:13px;margin-bottom:8px;text-decoration:none;text-align:center;box-sizing:border-box;"><i class="fas fa-book-download" style="margin-right:4px;"></i>AB变频手册下载</a>
+                    <button onclick="showWechatQR()" style="display:block;width:100%;padding:8px;border:none;border-radius:6px;background:rgba(6,182,212,0.15);color:#22d3ee;cursor:pointer;font-size:13px;margin-bottom:8px;box-sizing:border-box;"><i class="fas fa-graduation-cap" style="margin-right:4px;"></i>变频器技术使用指南</button>
+                    <div style="font-size:11px;color:#64748b;line-height:1.5;"><i class="fas fa-info-circle" style="color:#3b82f6;margin-right:4px;"></i>回答基于内置知识库与调试经验生成，仅供参考。</div>
+                </div>
+            </aside>
+            <div style="flex:1;display:flex;flex-direction:column;min-width:0;background:#f1f5f9;">
+                <div id="chatMessages" style="flex:1;overflow-y:auto;padding:24px;">
+                    <div id="chatWelcome" style="max-width:640px;margin:40px auto;text-align:center;">
+                        <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#3b82f6,#1e40af);margin:0 auto 16px;display:flex;align-items:center;justify-content:center;"><i class="fas fa-tools" style="font-size:32px;color:#fff;"></i></div>
+                        <h2 style="font-size:20px;color:#1e293b;margin-bottom:6px;">调试经验分享助手</h2>
+                        <p style="color:#64748b;margin-bottom:28px;font-size:14px;">AB低压变频器调试经验与问题解答</p>
+                        <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;text-align:left;">
+                            <div onclick="askExample(\'755T系列型号\')" class="ex-card"><div class="ex-label"><i class="fas fa-list"></i> 型号查询</div><div class="ex-text">755T系列有哪些型号？</div></div>
+                            <div onclick="askExample(\'故障代码1\')" class="ex-card"><div class="ex-label"><i class="fas fa-exclamation-triangle"></i> 故障查询</div><div class="ex-text">故障代码1是什么？</div></div>
+                            <div onclick="askExample(\'参数0:3\')" class="ex-card"><div class="ex-label"><i class="fas fa-search"></i> 参数查询</div><div class="ex-text">参数0:3 DC Bus Volts</div></div>
+                            <div onclick="askExample(\'电机控制模式\')" class="ex-card"><div class="ex-label"><i class="fas fa-cogs"></i> 功能查询</div><div class="ex-text">电机控制模式有哪些？</div></div>
+                            <div onclick="askExample(\'掉电穿越\')" class="ex-card"><div class="ex-label"><i class="fas fa-bolt"></i> 专用功能</div><div class="ex-text">掉电穿越功能怎么用？</div></div>
+                            <div onclick="askExample(\'预测性维护\')" class="ex-card"><div class="ex-label"><i class="fas fa-wrench"></i> 维护保养</div><div class="ex-text">预测性维护功能介绍</div></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    </div>
+    
+    </div><!-- /mainWrapper -->
+    
+    <!-- 批量查询模态框 -->
+    <div id="batch-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="modal-content bg-white rounded-xl p-6 w-full max-w-2xl mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">批量查询备件</h2>
+                <button onclick="closeBatchModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    输入目录号或名称(每行一个或用逗号分隔)
+                </label>
+                <textarea id="batch-input" class="batch-input w-full border border-gray-300 rounded-lg p-3 focus:ring-2 focus:ring-blue-500"
+                          placeholder="例如:
+SK-RT-MCB1-PF755
+SK-RT-BKPLN
+主控电路板"></textarea>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeBatchModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    取消
+                </button>
+                <button onclick="performBatchSearch()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    开始查询
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 导入模态框 -->
+    <div id="import-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="modal-content bg-white rounded-xl p-6 w-full max-w-lg mx-4">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800">导入Excel数据</h2>
+                <button onclick="closeImportModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    选择Excel文件(.xlsx)
+                </label>
+                <input type="file" id="import-file" accept=".xlsx" class="w-full border border-gray-300 rounded-lg p-2">
+                <p class="text-xs text-gray-500 mt-2">
+                    提示: 请使用之前导出的Excel模板格式
+                </p>
+            </div>
+            <div class="flex justify-end gap-3">
+                <button onclick="closeImportModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                    取消
+                </button>
+                <button onclick="importData()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    导入
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 图片查看模态框 -->
+    <div id="image-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="modal-content bg-white rounded-xl p-4 max-w-4xl max-h-[90vh]">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-lg font-bold text-gray-800" id="image-modal-title">备件图片</h2>
+                <button onclick="closeImageModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <div class="text-center">
+                <img id="modal-image" src="" alt="备件图片" class="max-w-full max-h-[70vh] rounded-lg">
+            </div>
+            <div class="mt-4 flex justify-center gap-3" id="image-actions">
+                <button onclick="replaceImage()" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                    <i class="fas fa-upload mr-2"></i>更换图片
+                </button>
+                <button onclick="deleteImage()" class="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700">
+                    <i class="fas fa-trash mr-2"></i>删除图片
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 图片上传input(隐藏) -->
+    <input type="file" id="image-upload" accept="image/*" class="hidden" onchange="handleImageUpload(event)">
+    
+    <!-- 新增/编辑备件模态框 -->
+    <div id="edit-modal" class="fixed inset-0 modal-overlay hidden z-50 flex items-center justify-center">
+        <div class="modal-content bg-white rounded-xl p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-bold text-gray-800" id="edit-modal-title">编辑备件</h2>
+                <button onclick="closeEditModal()" class="text-gray-500 hover:text-gray-700">
+                    <i class="fas fa-times text-xl"></i>
+                </button>
+            </div>
+            <form id="edit-form" class="space-y-4">
+                <input type="hidden" id="edit-id">
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">目录号(标准)</label>
+                        <input type="text" id="edit-catalognumber" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">目录号(XT版)</label>
+                        <input type="text" id="edit-catalognumberxt" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">英文名称</label>
+                    <input type="text" id="edit-description" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">中文名称</label>
+                    <input type="text" id="edit-descriptioncn" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">分类</label>
+                        <select id="edit-category" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                            <option value="PF755TS">PF755TS</option>
+                            <option value="PF755TL">PF755TL</option>
+                            <option value="PF755TR">PF755TR</option>
+                            <option value="PF755TM-CBI">PF755TM - Common Bus Inverters</option>
+                            <option value="PF755TM-BusSupply">PF755TM - Bus Supply</option>
+                            <option value="其他">其他</option>
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-1">适用Frame</label>
+                        <input type="text" id="edit-framesize" class="w-full border border-gray-300 rounded-lg px-3 py-2" placeholder="例如: 1,2,3">
+                    </div>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">外壳类型</label>
+                    <input type="text" id="edit-enclosuretype" class="w-full border border-gray-300 rounded-lg px-3 py-2">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">备注</label>
+                    <textarea id="edit-notes" class="w-full border border-gray-300 rounded-lg px-3 py-2" rows="2"></textarea>
+                </div>
+                <div class="flex justify-end gap-3 pt-4">
+                    <button type="button" onclick="closeEditModal()" class="px-4 py-2 border border-gray-300 rounded-lg hover:bg-gray-50">
+                        取消
+                    </button>
+                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">
+                        保存
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+    
+    <!-- Toast提示 -->
+    <div id="toast" class="toast hidden"></div>
+
+<script>
+// 备件数据
+const allKits = [
+    {id:1, kitCatalogNumber:"SK-RT-CVR1-F1", kitCatalogNumberXT:"SK-RT-CVR1-F1-XT", description:"Power Terminal Cover (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"电源端子盖板(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"1", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:2, kitCatalogNumber:"SK-RT-CVR1-F2", kitCatalogNumberXT:"SK-RT-CVR1-F2-XT", description:"Power Terminal Cover (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"电源端子盖板(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"2", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:3, kitCatalogNumber:"SK-RT-CVR1-F3", kitCatalogNumberXT:"SK-RT-CVR1-F3-XT", description:"Power Terminal Cover (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"电源端子盖板(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"3", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:4, kitCatalogNumber:"SK-RT-CVR1-F4", kitCatalogNumberXT:"SK-RT-CVR1-F4-XT", description:"Power Terminal Cover (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"电源端子盖板(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"4", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:5, kitCatalogNumber:"SK-RT-CVR1-F5", kitCatalogNumberXT:"SK-RT-CVR1-F5-XT", description:"Power Terminal Cover (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"电源端子盖板(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"5", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:6, kitCatalogNumber:"SK-RT-CVR12-F2", kitCatalogNumberXT:"SK-RT-CVR12-F2-XT", description:"IP54, NEMA/UL Type 12 Enclosure Cover", descriptionCN:"IP54/NEMA/UL Type 12外壳盖板", category:"PF755TS", frameSize:"2", enclosureType:"IP54, NEMA/UL Type 12", notes:""},
+    {id:7, kitCatalogNumber:"SK-RT-CVR12-F3", kitCatalogNumberXT:"SK-RT-CVR12-F3-XT", description:"IP54, NEMA/UL Type 12 Enclosure Cover", descriptionCN:"IP54/NEMA/UL Type 12外壳盖板", category:"PF755TS", frameSize:"3", enclosureType:"IP54, NEMA/UL Type 12", notes:""},
+    {id:8, kitCatalogNumber:"SK-RT-CVR12-F4", kitCatalogNumberXT:"SK-RT-CVR12-F4-XT", description:"IP54, NEMA/UL Type 12 Enclosure Cover", descriptionCN:"IP54/NEMA/UL Type 12外壳盖板", category:"PF755TS", frameSize:"4", enclosureType:"IP54, NEMA/UL Type 12", notes:""},
+    {id:9, kitCatalogNumber:"SK-RT-CVR12-F5", kitCatalogNumberXT:"SK-RT-CVR12-F5-XT", description:"IP54, NEMA/UL Type 12 Enclosure Cover", descriptionCN:"IP54/NEMA/UL Type 12外壳盖板", category:"PF755TS", frameSize:"5", enclosureType:"IP54, NEMA/UL Type 12", notes:""},
+    {id:10, kitCatalogNumber:"SK-RT-CHSS1-F1", kitCatalogNumberXT:"SK-RT-CHSS1-F1-XT", description:"Chassis (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"机壳(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"1", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:11, kitCatalogNumber:"SK-RT-CHSS1-F2", kitCatalogNumberXT:"SK-RT-CHSS1-F2-XT", description:"Chassis (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"机壳(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"2", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:12, kitCatalogNumber:"SK-RT-CHSS1-F3", kitCatalogNumberXT:"SK-RT-CHSS1-F3-XT", description:"Chassis (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"机壳(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"3", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:13, kitCatalogNumber:"SK-RT-CHSS1-F4", kitCatalogNumberXT:"SK-RT-CHSS1-F4-XT", description:"Chassis (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"机壳(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"4", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:14, kitCatalogNumber:"SK-RT-CHSS1-F5", kitCatalogNumberXT:"SK-RT-CHSS1-F5-XT", description:"Chassis (for IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"机壳(IP20/NEMA/UL Type 1/法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"5", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:15, kitCatalogNumber:"SK-RT-FG1-F2", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"2", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:16, kitCatalogNumber:"SK-RT-FG1-F3", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"3", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:17, kitCatalogNumber:"SK-RT-FG1-F4", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"4", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:18, kitCatalogNumber:"SK-RT-FG1-F5", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"5", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:19, kitCatalogNumber:"SK-RT-PODFAN1", kitCatalogNumberXT:"SK-RT-PODFAN1-XT", description:"Control Pod Printed Circuit Board Fan (for All Enclosure Types)", descriptionCN:"控制舱PCB风扇(适用所有外壳类型)", category:"PF755TS", frameSize:"2,3,4,5", enclosureType:"All Enclosure Types", notes:""},
+    {id:20, kitCatalogNumber:"SK-RT-HSFAN1-F12", kitCatalogNumberXT:"SK-RT-HSFAN1-F12-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"1", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:21, kitCatalogNumber:"SK-RT-HSFAN1-F3A", kitCatalogNumberXT:"SK-RT-HSFAN1-F3A-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"3", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:22, kitCatalogNumber:"SK-RT-HSFAN1-F3", kitCatalogNumberXT:"SK-RT-HSFAN1-F3-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"3", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:23, kitCatalogNumber:"SK-RT-HSFAN1-F4", kitCatalogNumberXT:"SK-RT-HSFAN1-F4-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"4", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:24, kitCatalogNumber:"SK-RT-HSFAN1-F5A", kitCatalogNumberXT:"SK-RT-HSFAN1-F5A-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"5", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:25, kitCatalogNumber:"SK-RT-HSFAN1-F5", kitCatalogNumberXT:"SK-RT-HSFAN1-F5-XT", description:"Heatsink Fan (for IP20, NEMA/UL Open Type and IP20, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP20/UL开式和IP20/UL Type 1外壳)", category:"PF755TS", frameSize:"5", enclosureType:"IP20, NEMA/UL Open Type, IP20, NEMA/UL Type 1", notes:""},
+    {id:26, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-HSFAN2-F2-XT", description:"Heatsink Fan (for Flange, NEMA/UL Type 4X/12 back and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"散热风扇(法兰型4X/12背板和IP54/UL Type 12外壳)", category:"PF755TS", frameSize:"2", enclosureType:"Flange, NEMA/UL Type 4X/12 Back, IP54, NEMA/UL Type 12", notes:""},
+    {id:27, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-HSFAN2-F3-XT", description:"Heatsink Fan (for Flange, NEMA/UL Type 4X/12 back and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"散热风扇(法兰型4X/12背板和IP54/UL Type 12外壳)", category:"PF755TS", frameSize:"3", enclosureType:"Flange, NEMA/UL Type 4X/12 Back, IP54, NEMA/UL Type 12", notes:""},
+    {id:28, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-HSFAN2-F45-XT", description:"Heatsink Fan (for Flange, NEMA/UL Type 4X/12 back and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"散热风扇(法兰型4X/12背板和IP54/UL Type 12外壳)", category:"PF755TS", frameSize:"4,5", enclosureType:"Flange, NEMA/UL Type 4X/12 Back, IP54, NEMA/UL Type 12", notes:""},
+    {id:29, kitCatalogNumber:"SK-RT-STIRFAN1-F45", kitCatalogNumberXT:"SK-RT-STIRFAN1-F45-XT", description:"Internal Stirring Fan (for All Enclosure Types)", descriptionCN:"内部搅拌风扇(适用所有外壳类型)", category:"PF755TS", frameSize:"4,5", enclosureType:"All Enclosure Types", notes:""},
+    {id:30, kitCatalogNumber:"SK-RT-BZL1", kitCatalogNumberXT:"SK-RT-BZL1-XT", description:"Control Pod Human Interface Module (HIM) Cradle (for All Enclosure Types)", descriptionCN:"控制舱HIM支架(适用所有外壳类型)", category:"PF755TS", frameSize:"2,3,4,5", enclosureType:"All Enclosure Types", notes:""},
+    {id:31, kitCatalogNumber:"SK-RT-MCB1-PF755", kitCatalogNumberXT:"SK-RT-MCB1-PF755-XT", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TS", frameSize:"1", enclosureType:"", notes:""},
+    {id:32, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-PIC1-F1-XT", description:"Main Control Board to Power Interface Board Ribbon Cable", descriptionCN:"主控板到功率接口板排线", category:"PF755TS", frameSize:"1", enclosureType:"", notes:""},
+    {id:33, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-PIC1-F27-XT", description:"Main Control Board to Power Interface Board Ribbon Cable", descriptionCN:"主控板到功率接口板排线", category:"PF755TS", frameSize:"2,3,4,5", enclosureType:"", notes:""},
+    {id:34, kitCatalogNumber:"SK-RT-BKPLN", kitCatalogNumberXT:"SK-RT-BKPLN-XT", description:"Backplane Circuit Board (Kit Contains 1 Circuit Board)", descriptionCN:"背板电路板(套件包含1块电路板)", category:"PF755TS", frameSize:"1", enclosureType:"", notes:""},
+    {id:35, kitCatalogNumber:"SK-RT-EMC3-F1", kitCatalogNumberXT:"", description:"EMC C3 Ground Plate (400/480V)", descriptionCN:"EMC C3接地板(400/480V)", category:"PF755TS", frameSize:"1", enclosureType:"", notes:""},
+    {id:36, kitCatalogNumber:"SK-RT-EMC3-F2", kitCatalogNumberXT:"", description:"EMC C3 Ground Plate (400/480V)", descriptionCN:"EMC C3接地板(400/480V)", category:"PF755TS", frameSize:"2", enclosureType:"", notes:""},
+    {id:37, kitCatalogNumber:"SK-RT-EMC3-F3", kitCatalogNumberXT:"", description:"EMC C3 Ground Plate (400/480V)", descriptionCN:"EMC C3接地板(400/480V)", category:"PF755TS", frameSize:"3", enclosureType:"", notes:""},
+    {id:38, kitCatalogNumber:"SK-RT-EMC3-F4", kitCatalogNumberXT:"", description:"EMC C3 Ground Plate (400/480V)", descriptionCN:"EMC C3接地板(400/480V)", category:"PF755TS", frameSize:"4", enclosureType:"", notes:""},
+    {id:39, kitCatalogNumber:"SK-RT-EMC3-F5", kitCatalogNumberXT:"", description:"EMC C3 Ground Plate (400/480V)", descriptionCN:"EMC C3接地板(400/480V)", category:"PF755TS", frameSize:"5", enclosureType:"", notes:""},
+    {id:40, kitCatalogNumber:"SK-RT-AD1-F67", kitCatalogNumberXT:"SK-RT-AD1-F67-XT", description:"Control Pod Access Door (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"控制舱检修门(IP00/UL开式/IP21/UL Type 1/法兰型4X/12背板)", category:"PF755TS", frameSize:"6", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:41, kitCatalogNumber:"SK-RT-CVR1-F6", kitCatalogNumberXT:"SK-RT-CVR1-F6-XT", description:"Cover (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"盖板(IP00/UL开式/IP21/UL Type 1/法兰型4X/12背板)", category:"PF755TS", frameSize:"6", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:42, kitCatalogNumber:"SK-RT-BZL1", kitCatalogNumberXT:"SK-RT-BZL1-XT", description:"Control Pod Human Interface Module (HIM) Cradle (for All Enclosure Types)", descriptionCN:"控制舱HIM支架(适用所有外壳类型)", category:"PF755TS", frameSize:"6", enclosureType:"All Enclosure Types", notes:""},
+    {id:43, kitCatalogNumber:"SK-RT-MCB1-PF755", kitCatalogNumberXT:"SK-RT-MCB1-PF755-XT", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:44, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-PIC1-F27-XT", description:"Main Control Board to Power Interface Board Ribbon Cable", descriptionCN:"主控板到功率接口板排线", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:45, kitCatalogNumber:"SK-RT-BKPLN", kitCatalogNumberXT:"SK-RT-BKPLN-XT", description:"Backplane Circuit Board", descriptionCN:"背板电路板", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:46, kitCatalogNumber:"SK-RT-HSFAN1-F6", kitCatalogNumberXT:"SK-RT-HSFAN1-F6-XT", description:"Heatsink Fan (for IP00, NEMA/UL Open Type and IP21, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇(IP00/UL开式和IP21/UL Type 1外壳)", category:"PF755TS", frameSize:"6", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1", notes:""},
+    {id:47, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-HSFAN2-F6-XT", description:"Heatsink Fan (for Flange, NEMA/UL Type 4X/12 Back and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"散热风扇(法兰型4X/12背板和IP54/UL Type 12外壳)", category:"PF755TS", frameSize:"6", enclosureType:"Flange, NEMA/UL Type 4X/12 Back, IP54, NEMA/UL Type 12", notes:""},
+    {id:48, kitCatalogNumber:"SK-RT-STIRFAN1R-F6", kitCatalogNumberXT:"SK-RT-STIRFAN1R-F6-XT", description:"Upper Stirring Fan (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back, and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"上部搅拌风扇", category:"PF755TS", frameSize:"6", enclosureType:"IP00, IP21, Flange, IP54", notes:""},
+    {id:49, kitCatalogNumber:"SK-RT-STIRFANL1-F6", kitCatalogNumberXT:"SK-RT-STIRFANL1-F6-XT", description:"Lower Stirring Fan Assembly (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back, and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"下部搅拌风扇组件", category:"PF755TS", frameSize:"6", enclosureType:"IP00, IP21, Flange, IP54", notes:""},
+    {id:50, kitCatalogNumber:"SK-RT-FG1-F6", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"6", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:51, kitCatalogNumber:"SK-RT-PIB1-B080", kitCatalogNumberXT:"SK-RT-PIB1-B080-XT", description:"Power Interface Circuit Board, 92A 208V/80A 240V", descriptionCN:"功率接口电路板, 92A 208V/80A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:52, kitCatalogNumber:"SK-RT-PIB1-B104", kitCatalogNumberXT:"SK-RT-PIB1-B104-XT", description:"Power Interface Circuit Board, 120A 208V/104A 240V", descriptionCN:"功率接口电路板, 120A 208V/104A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:53, kitCatalogNumber:"SK-RT-PIB1-B130", kitCatalogNumberXT:"SK-RT-PIB1-B130-XT", description:"Power Interface Circuit Board, 150A 208V/130A 240V", descriptionCN:"功率接口电路板, 150A 208V/130A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:54, kitCatalogNumber:"SK-RT-PIB1-B154", kitCatalogNumberXT:"SK-RT-PIB1-B154-XT", description:"Power Interface Circuit Board, 177A 208V/154A 240V", descriptionCN:"功率接口电路板, 177A 208V/154A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:55, kitCatalogNumber:"SK-RT-PIB1-B192", kitCatalogNumberXT:"SK-RT-PIB1-B192-XT", description:"Power Interface Circuit Board, 221A 208V/192A 240V", descriptionCN:"功率接口电路板, 221A 208V/192A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:56, kitCatalogNumber:"SK-RT-PIB1-B260-F6", kitCatalogNumberXT:"SK-RT-PIB1-B260-F6-XT", description:"Power Interface Circuit Board, 260A 208V/260A 240V", descriptionCN:"功率接口电路板, 260A 208V/260A 240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"208V/240V"},
+    {id:57, kitCatalogNumber:"SK-RT-PIB1-C104D096", kitCatalogNumberXT:"SK-RT-PIB1-C104D096-XT", description:"Power Interface Circuit Board, 104A 400V/96A 480V", descriptionCN:"功率接口电路板, 104A 400V/96A 480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"400V/480V"},
+    {id:58, kitCatalogNumber:"SK-RT-PIB1-C140D125", kitCatalogNumberXT:"SK-RT-PIB1-C140D125-XT", description:"Power Interface Circuit Board, 140A 400V/125A 480V", descriptionCN:"功率接口电路板, 140A 400V/125A 480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"400V/480V"},
+    {id:59, kitCatalogNumber:"SK-RT-PIB1-C170D156", kitCatalogNumberXT:"SK-RT-PIB1-C170D156-XT", description:"Power Interface Circuit Board, 170A 400V/156A 480V", descriptionCN:"功率接口电路板, 170A 400V/156A 480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"400V/480V"},
+    {id:60, kitCatalogNumber:"SK-RT-PIB1-C205D186", kitCatalogNumberXT:"SK-RT-PIB1-C205D186-XT", description:"Power Interface Circuit Board, 205A 400V/186A 480V", descriptionCN:"功率接口电路板, 205A 400V/186A 480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"400V/480V"},
+    {id:61, kitCatalogNumber:"SK-RT-PIB1-C260D248", kitCatalogNumberXT:"SK-RT-PIB1-C260D248-XT", description:"Power Interface Circuit Board, 260A 400V/248A 480V", descriptionCN:"功率接口电路板, 260A 400V/248A 480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"400V/480V"},
+    {id:62, kitCatalogNumber:"SK-RT-PIB1-E012F012", kitCatalogNumberXT:"SK-RT-PIB1-E012F012-XT", description:"Power Interface Circuit Board, 12A 600V/12A 690V", descriptionCN:"功率接口电路板, 12A 600V/12A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:63, kitCatalogNumber:"SK-RT-PIB1-E018F015", kitCatalogNumberXT:"SK-RT-PIB1-E018F015-XT", description:"Power Interface Circuit Board, 18A 600V/15A 690V", descriptionCN:"功率接口电路板, 18A 600V/15A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:64, kitCatalogNumber:"SK-RT-PIB1-E023F020", kitCatalogNumberXT:"SK-RT-PIB1-E023F020-XT", description:"Power Interface Circuit Board, 23A 600V/20A 690V", descriptionCN:"功率接口电路板, 23A 600V/20A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:65, kitCatalogNumber:"SK-RT-PIB1-E024F023", kitCatalogNumberXT:"SK-RT-PIB1-E024F023-XT", description:"Power Interface Circuit Board, 24A 600V/23A 690V", descriptionCN:"功率接口电路板, 24A 600V/23A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:66, kitCatalogNumber:"SK-RT-PIB1-E028F030", kitCatalogNumberXT:"SK-RT-PIB1-E028F030-XT", description:"Power Interface Circuit Board, 28A 600V/30A 690V", descriptionCN:"功率接口电路板, 28A 600V/30A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:67, kitCatalogNumber:"SK-RT-PIB1-E033F034", kitCatalogNumberXT:"SK-RT-PIB1-E033F034-XT", description:"Power Interface Circuit Board, 33A 600V/34A 690V", descriptionCN:"功率接口电路板, 33A 600V/34A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:68, kitCatalogNumber:"SK-RT-PIB1-E042F046", kitCatalogNumberXT:"SK-RT-PIB1-E042F046-XT", description:"Power Interface Circuit Board, 42A 600V/46A 690V", descriptionCN:"功率接口电路板, 42A 600V/46A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:69, kitCatalogNumber:"SK-RT-PIB1-E053F050", kitCatalogNumberXT:"SK-RT-PIB1-E053F050-XT", description:"Power Interface Circuit Board, 53A 600V/50A 690V", descriptionCN:"功率接口电路板, 53A 600V/50A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:70, kitCatalogNumber:"SK-RT-PIB1-E063F061", kitCatalogNumberXT:"SK-RT-PIB1-E063F061-XT", description:"Power Interface Circuit Board, 63A 600V/61A 690V", descriptionCN:"功率接口电路板, 63A 600V/61A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:71, kitCatalogNumber:"SK-RT-PIB1-E077F082", kitCatalogNumberXT:"SK-RT-PIB1-E077F082-XT", description:"Power Interface Circuit Board, 77A 600V/82A 690V", descriptionCN:"功率接口电路板, 77A 600V/82A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:72, kitCatalogNumber:"SK-RT-PIB1-E099F098", kitCatalogNumberXT:"SK-RT-PIB1-E099F098-XT", description:"Power Interface Circuit Board, 99A 600V/98A 690V", descriptionCN:"功率接口电路板, 99A 600V/98A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:73, kitCatalogNumber:"SK-RT-PIB1-E125F119", kitCatalogNumberXT:"SK-RT-PIB1-E125F119-XT", description:"Power Interface Circuit Board, 125A 600V/119A 690V", descriptionCN:"功率接口电路板, 125A 600V/119A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:74, kitCatalogNumber:"SK-RT-PIB1-E144F142", kitCatalogNumberXT:"SK-RT-PIB1-E144F142-XT", description:"Power Interface Circuit Board, 144A 600V/142A 690V", descriptionCN:"功率接口电路板, 144A 600V/142A 690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:75, kitCatalogNumber:"SK-RT-ACPC-BF6", kitCatalogNumberXT:"SK-RT-ACPC-BF6-XT", description:"AC Precharge Circuit Board, 208V/240V", descriptionCN:"交流预充电电路板, 208V/240V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:76, kitCatalogNumber:"SK-RT-ACPC-CDF6", kitCatalogNumberXT:"SK-RT-ACPC-CDF6-XT", description:"AC Precharge Circuit Board, 400V/480V", descriptionCN:"交流预充电电路板, 400V/480V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:77, kitCatalogNumber:"SK-RT-ACPC-EFF6", kitCatalogNumberXT:"SK-RT-ACPC-EFF6-XT", description:"AC Precharge Circuit Board, 600V/690V", descriptionCN:"交流预充电电路板, 600V/690V", category:"PF755TS", frameSize:"6", enclosureType:"", notes:""},
+    {id:78, kitCatalogNumber:"SK-RT-DCPC-F67", kitCatalogNumberXT:"SK-RT-DCPC-F67-XT", description:"DC Precharge Circuit Board", descriptionCN:"直流预充电电路板", category:"PF755TS", frameSize:"6,7", enclosureType:"", notes:""},
+    {id:79, kitCatalogNumber:"SK-RT-AD1-F67", kitCatalogNumberXT:"SK-RT-AD1-F67-XT", description:"Control Pod Access Door (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"控制舱检修门(IP00/UL开式/IP21/UL Type 1/法兰型4X/12背板)", category:"PF755TS", frameSize:"7", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:80, kitCatalogNumber:"SK-RT-CVR1-F7", kitCatalogNumberXT:"SK-RT-CVR1-F7-XT", description:"Cover (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"盖板(IP00/UL开式/IP21/UL Type 1/法兰型4X/12背板)", category:"PF755TS", frameSize:"7", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:81, kitCatalogNumber:"SK-RT-BZL1", kitCatalogNumberXT:"SK-RT-BZL1-XT", description:"Control Pod Human Interface Module (HIM) Cradle (for All Enclosure Types)", descriptionCN:"控制舱HIM支架(适用所有外壳类型)", category:"PF755TS", frameSize:"7", enclosureType:"All Enclosure Types", notes:""},
+    {id:82, kitCatalogNumber:"SK-RT-MCB1-PF755", kitCatalogNumberXT:"SK-RT-MCB1-PF755-XT", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:83, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-PIC1-F27-XT", description:"Main Control Board to Power Interface Board Ribbon Cable", descriptionCN:"主控板到功率接口板排线", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:84, kitCatalogNumber:"SK-RT-BKPLN", kitCatalogNumberXT:"SK-RT-BKPLN-XT", description:"Backplane Circuit Board (Kit Contains 1 Circuit Board)", descriptionCN:"背板电路板(套件包含1块电路板)", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:85, kitCatalogNumber:"SK-RT-HSFAN1-F7", kitCatalogNumberXT:"SK-RT-HSFAN1-F7-XT", description:"Heatsink Fan Assembly (for IP00, NEMA/UL Open Type and IP21, NEMA/UL Type 1 Enclosures)", descriptionCN:"散热风扇组件(IP00/UL开式和IP21/UL Type 1外壳)", category:"PF755TS", frameSize:"7", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1", notes:""},
+    {id:86, kitCatalogNumber:"", kitCatalogNumberXT:"SK-RT-HSFAN2-F7-XT", description:"Heatsink Fan Assembly (for Flange, NEMA/UL Type 4X/12 Back and IP54, NEMA/UL Type 12 Enclosures)", descriptionCN:"散热风扇组件(法兰型4X/12背板和IP54/UL Type 12外壳)", category:"PF755TS", frameSize:"7", enclosureType:"Flange, NEMA/UL Type 4X/12 Back, IP54, NEMA/UL Type 12", notes:""},
+    {id:87, kitCatalogNumber:"SK-RT-STIRFAN1-F7", kitCatalogNumberXT:"SK-RT-STIRFAN1-F7-XT", description:"Stirring Fan Assembly (for All Enclosure Types)", descriptionCN:"搅拌风扇组件(适用所有外壳类型)", category:"PF755TS", frameSize:"7", enclosureType:"All Enclosure Types", notes:""},
+    {id:88, kitCatalogNumber:"SK-RT-FG1-F7", kitCatalogNumberXT:"", description:"Flange Gasket (for Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"法兰垫圈(法兰型4X/12背板外壳)", category:"PF755TS", frameSize:"7", enclosureType:"Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:89, kitCatalogNumber:"SK-RT-PIB1-B260-F7", kitCatalogNumberXT:"SK-RT-PIB1-B260-F7-XT", description:"Power Interface Circuit Board, 260A 208V/260A 240V", descriptionCN:"功率接口电路板, 260A 208V/260A 240V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"208V/240V"},
+    {id:90, kitCatalogNumber:"SK-RT-PIB1-B312", kitCatalogNumberXT:"SK-RT-PIB1-B312-XT", description:"Power Interface Circuit Board, 359A 208V/312A 240V", descriptionCN:"功率接口电路板, 359A 208V/312A 240V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"208V/240V"},
+    {id:91, kitCatalogNumber:"SK-RT-PIB1-B360", kitCatalogNumberXT:"SK-RT-PIB1-B360-XT", description:"Power Interface Circuit Board, 414A 208V/360A 240V", descriptionCN:"功率接口电路板, 414A 208V/360A 240V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"208V/240V"},
+    {id:92, kitCatalogNumber:"SK-RT-PIB1-B477", kitCatalogNumberXT:"SK-RT-PIB1-B477-XT", description:"Power Interface Circuit Board, 477A 208V/477A 240V", descriptionCN:"功率接口电路板, 477A 208V/477A 240V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"208V/240V"},
+    {id:93, kitCatalogNumber:"SK-RT-PIB1-C260D248-F7", kitCatalogNumberXT:"SK-RT-PIB1-C260D248-F7-XT", description:"Power Interface Circuit Board, 260A 400V/248A 480V", descriptionCN:"功率接口电路板, 260A 400V/248A 480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"400V/480V"},
+    {id:94, kitCatalogNumber:"SK-RT-PIB1-C302D302", kitCatalogNumberXT:"SK-RT-PIB1-C302D302-XT", description:"Power Interface Circuit Board, 302A 400V/302A 480V", descriptionCN:"功率接口电路板, 302A 400V/302A 480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"400V/480V"},
+    {id:95, kitCatalogNumber:"SK-RT-PIB1-C367D361", kitCatalogNumberXT:"SK-RT-PIB1-C367D361-XT", description:"Power Interface Circuit Board, 367A 400V/361A 480V", descriptionCN:"功率接口电路板, 367A 400V/361A 480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"400V/480V"},
+    {id:96, kitCatalogNumber:"SK-RT-PIB1-C456D415", kitCatalogNumberXT:"SK-RT-PIB1-C456D415-XT", description:"Power Interface Circuit Board, 456A 400V/415A 480V", descriptionCN:"功率接口电路板, 456A 400V/415A 480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"400V/480V"},
+    {id:97, kitCatalogNumber:"SK-RT-PIB1-C477D477", kitCatalogNumberXT:"SK-RT-PIB1-C477D477-XT", description:"Power Interface Circuit Board, 477A 400V/477A 480V", descriptionCN:"功率接口电路板, 477A 400V/477A 480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"400V/480V"},
+    {id:98, kitCatalogNumber:"SK-RT-PIB1-E192F171", kitCatalogNumberXT:"SK-RT-PIB1-E192F171-XT", description:"Power Interface Circuit Board, 192A 600V/171A 690V", descriptionCN:"功率接口电路板, 192A 600V/171A 690V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"600V/690V"},
+    {id:99, kitCatalogNumber:"SK-RT-PIB1-E242F212", kitCatalogNumberXT:"SK-RT-PIB1-E242F212-XT", description:"Power Interface Circuit Board, 242A 600V/212A 690V", descriptionCN:"功率接口电路板, 242A 600V/212A 690V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"600V/690V"},
+    {id:100, kitCatalogNumber:"SK-RT-PIB1-E289F263", kitCatalogNumberXT:"SK-RT-PIB1-E289F263-XT", description:"Power Interface Circuit Board, 289A 600V/263A 690V", descriptionCN:"功率接口电路板, 289A 600V/263A 690V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:"600V/690V"},
+    {id:101, kitCatalogNumber:"SK-RT-ACPC-BF7", kitCatalogNumberXT:"SK-RT-ACPC-BF7-XT", description:"AC Precharge Circuit Board, 208V/240V", descriptionCN:"交流预充电电路板, 208V/240V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:102, kitCatalogNumber:"SK-RT-ACPC-CDF7", kitCatalogNumberXT:"SK-RT-ACPC-CDF7-XT", description:"AC Precharge Circuit Board, 400V/480V", descriptionCN:"交流预充电电路板, 400V/480V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:103, kitCatalogNumber:"SK-RT-ACPC-EFF7", kitCatalogNumberXT:"SK-RT-ACPC-EFF7-XT", description:"AC Precharge Circuit Board, 600V/690V", descriptionCN:"交流预充电电路板, 600V/690V", category:"PF755TS", frameSize:"7", enclosureType:"", notes:""},
+    {id:104, kitCatalogNumber:"SK-RT-CVR1-F7A", kitCatalogNumberXT:"SK-RT-CVR1-F7A-XT", description:"Cover (for IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, and Flange, NEMA/UL Type 4X/12 Back Enclosures)", descriptionCN:"盖板(IP00/UL开式/IP21/UL Type 1/法兰型4X/12背板)", category:"PF755TS", frameSize:"7A", enclosureType:"IP00, NEMA/UL Open Type, IP21, NEMA/UL Type 1, Flange, NEMA/UL Type 4X/12 Back", notes:""},
+    {id:105, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TL", frameSize:"5", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:106, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TR", frameSize:"5", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:107, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TL", frameSize:"5", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:108, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TR", frameSize:"5", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:109, kitCatalogNumber:"SK-RM-MFAN1-F5", kitCatalogNumberXT:"", description:"Stirring Fan Assembly", descriptionCN:"搅拌风扇组件", category:"PF755TL", frameSize:"5", enclosureType:"", notes:""},
+    {id:110, kitCatalogNumber:"SK-RM-MFAN1-F5", kitCatalogNumberXT:"", description:"Stirring Fan Assembly", descriptionCN:"搅拌风扇组件", category:"PF755TR", frameSize:"5", enclosureType:"", notes:""},
+    {id:111, kitCatalogNumber:"SK-RM-HSFAN1-F5", kitCatalogNumberXT:"", description:"Heatsink Fan Assembly", descriptionCN:"散热风扇组件", category:"PF755TL", frameSize:"5", enclosureType:"", notes:""},
+    {id:112, kitCatalogNumber:"SK-RM-HSFAN1-F5", kitCatalogNumberXT:"", description:"Heatsink Fan Assembly", descriptionCN:"散热风扇组件", category:"PF755TR", frameSize:"5", enclosureType:"", notes:""},
+    {id:113, kitCatalogNumber:"SK-RM-PSB1-F5-F6", kitCatalogNumberXT:"", description:"Fan Power Supply Circuit Board", descriptionCN:"风扇电源电路板", category:"PF755TL", frameSize:"5,6", enclosureType:"", notes:""},
+    {id:114, kitCatalogNumber:"SK-RM-PSB1-F5-F6", kitCatalogNumberXT:"", description:"Fan Power Supply Circuit Board", descriptionCN:"风扇电源电路板", category:"PF755TR", frameSize:"5,6", enclosureType:"", notes:""},
+    {id:115, kitCatalogNumber:"SK-RM-JMPR1-F5", kitCatalogNumberXT:"", description:"Potential Earth (PE) Jumper", descriptionCN:"保护接地(PE)跳线", category:"PF755TL", frameSize:"5", enclosureType:"", notes:""},
+    {id:116, kitCatalogNumber:"SK-RM-JMPR1-F5", kitCatalogNumberXT:"", description:"Potential Earth (PE) Jumper", descriptionCN:"保护接地(PE)跳线", category:"PF755TR", frameSize:"5", enclosureType:"", notes:""},
+    {id:117, kitCatalogNumber:"SK-RM-PFB-F5-F6", kitCatalogNumberXT:"", description:"Power Feedback Circuit Board and Bracket (XT)", descriptionCN:"功率反馈电路板及支架(XT版)", category:"PF755TL", frameSize:"5,6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:118, kitCatalogNumber:"SK-RM-PFB-F5-F6", kitCatalogNumberXT:"", description:"Power Feedback Circuit Board and Bracket (XT)", descriptionCN:"功率反馈电路板及支架(XT版)", category:"PF755TR", frameSize:"5,6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:119, kitCatalogNumber:"SK-RM-LCLCP4-F5", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V, 30kW/40Hp and higher drives", descriptionCN:"LCL滤波电容, 400V/480V, 30kW/40Hp及以上", category:"PF755TL", frameSize:"5", enclosureType:"", notes:"400V/480V, 30kW/40Hp及以上"},
+    {id:120, kitCatalogNumber:"SK-RM-LCLCP4-F5", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V, 30kW/40Hp and higher drives", descriptionCN:"LCL滤波电容, 400V/480V, 30kW/40Hp及以上", category:"PF755TR", frameSize:"5", enclosureType:"", notes:"400V/480V, 30kW/40Hp及以上"},
+    {id:121, kitCatalogNumber:"SK-RM-LCLCP6-F5", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V, 22kW/30Hp and lower and all 600V/690V drives", descriptionCN:"LCL滤波电容, 400V/480V 22kW/30Hp及以下, 所有600V/690V", category:"PF755TL", frameSize:"5", enclosureType:"", notes:"400V/480V 22kW/30Hp及以下, 所有600V/690V"},
+    {id:122, kitCatalogNumber:"SK-RM-LCLCP6-F5", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V, 22kW/30Hp and lower and all 600V/690V drives", descriptionCN:"LCL滤波电容, 400V/480V 22kW/30Hp及以下, 所有600V/690V", category:"PF755TR", frameSize:"5", enclosureType:"", notes:"400V/480V 22kW/30Hp及以下, 所有600V/690V"},
+    {id:123, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TL", frameSize:"6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:124, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TR", frameSize:"6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:125, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TL", frameSize:"6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:126, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TR", frameSize:"6", enclosureType:"", notes:"XT版本带有防护罩和介电油脂"},
+    {id:127, kitCatalogNumber:"SK-RM-MFAN1-F6", kitCatalogNumberXT:"", description:"Stirring Fan Assembly", descriptionCN:"搅拌风扇组件", category:"PF755TL", frameSize:"6", enclosureType:"", notes:""},
+    {id:128, kitCatalogNumber:"SK-RM-MFAN1-F6", kitCatalogNumberXT:"", description:"Stirring Fan Assembly", descriptionCN:"搅拌风扇组件", category:"PF755TR", frameSize:"6", enclosureType:"", notes:""},
+    {id:129, kitCatalogNumber:"SK-RM-HSFAN1-F6", kitCatalogNumberXT:"", description:"Heatsink Fan Assembly", descriptionCN:"散热风扇组件", category:"PF755TL", frameSize:"6", enclosureType:"", notes:""},
+    {id:130, kitCatalogNumber:"SK-RM-HSFAN1-F6", kitCatalogNumberXT:"", description:"Heatsink Fan Assembly", descriptionCN:"散热风扇组件", category:"PF755TR", frameSize:"6", enclosureType:"", notes:""},
+    {id:131, kitCatalogNumber:"SK-RM-JMPR1-F6", kitCatalogNumberXT:"", description:"DR and PE-A (EMC and MOV) Jumper", descriptionCN:"DR和PE-A(EMC和MOV)跳线", category:"PF755TL", frameSize:"6", enclosureType:"", notes:""},
+    {id:132, kitCatalogNumber:"SK-RM-JMPR1-F6", kitCatalogNumberXT:"", description:"DR and PE-A (EMC and MOV) Jumper", descriptionCN:"DR和PE-A(EMC和MOV)跳线", category:"PF755TR", frameSize:"6", enclosureType:"", notes:""},
+    {id:133, kitCatalogNumber:"SK-RM-LCLCP4-F6", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V drives and bus supplies", descriptionCN:"LCL滤波电容, 400V/480V驱动和总线电源", category:"PF755TL", frameSize:"6", enclosureType:"", notes:"400V/480V, 90kW/125Hp需1个, 110kW/150Hp及以上需2个"},
+    {id:134, kitCatalogNumber:"SK-RM-LCLCP4-F6", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 400V/480V drives and bus supplies", descriptionCN:"LCL滤波电容, 400V/480V驱动和总线电源", category:"PF755TR", frameSize:"6", enclosureType:"", notes:"400V/480V, 90kW/125Hp需1个, 110kW/150Hp及以上需2个"},
+    {id:135, kitCatalogNumber:"SK-RM-LCLCP6-F6", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 600V/690V drives and bus supplies", descriptionCN:"LCL滤波电容, 600V/690V驱动和总线电源", category:"PF755TL", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:136, kitCatalogNumber:"SK-RM-LCLCP6-F6", kitCatalogNumberXT:"", description:"LCL Filter Capacitor for 600V/690V drives and bus supplies", descriptionCN:"LCL滤波电容, 600V/690V驱动和总线电源", category:"PF755TR", frameSize:"6", enclosureType:"", notes:"600V/690V"},
+    {id:137, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:138, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:139, kitCatalogNumber:"SK-RM-SFAN1-F6L", kitCatalogNumberXT:"", description:"Stirring Fan 1 Assembly", descriptionCN:"搅拌风扇1组件", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:140, kitCatalogNumber:"SK-RM-SFAN2-F6L", kitCatalogNumberXT:"", description:"Stirring Fan 2 Assembly", descriptionCN:"搅拌风扇2组件", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:141, kitCatalogNumber:"SK-RM-PSFAN1-F6L", kitCatalogNumberXT:"", description:"Power Structure Fan Assembly", descriptionCN:"功率结构风扇组件", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:142, kitCatalogNumber:"SK-RM-FSFAN1-F6L", kitCatalogNumberXT:"", description:"Filter Section Fan Assembly", descriptionCN:"滤波段风扇组件", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:143, kitCatalogNumber:"SK-RM-JMPR1-F6L", kitCatalogNumberXT:"", description:"DR and PE-A (EMC and MOV) Jumper", descriptionCN:"DR和PE-A(EMC和MOV)跳线", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型"},
+    {id:144, kitCatalogNumber:"SK-RM-PFB2-F5-F6", kitCatalogNumberXT:"", description:"Power Feedback Circuit Board and Bracket (XT)", descriptionCN:"功率反馈电路板及支架(XT版)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型, XT版本"},
+    {id:145, kitCatalogNumber:"SK-RM-LCLCP4-F6L", kitCatalogNumberXT:"", description:"Capacitor (400V/530V)", descriptionCN:"电容(400V/530V)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型, 400V/530V"},
+    {id:146, kitCatalogNumber:"20L-GH10-B1", kitCatalogNumberXT:"", description:"Coolant Hose (Short)", descriptionCN:"冷却液软管(短)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型冷却液软管(短)"},
+    {id:147, kitCatalogNumber:"20L-GH30-B1", kitCatalogNumberXT:"", description:"Coolant Hose (Long)", descriptionCN:"冷却液软管(长)", category:"PF755TR", frameSize:"6L", enclosureType:"", notes:"液冷型冷却液软管(长)"},
+    {id:148, kitCatalogNumber:"SK-RM-PB8DR-21FLTR1", kitCatalogNumberXT:"", description:"IP21, 800mm Wide Door Vent Filters", descriptionCN:"IP21, 800mm宽门通风过滤器", category:"PF755TR", frameSize:"7L", enclosureType:"IP21", notes:"液冷型"},
+    {id:149, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector", descriptionCN:"控制舱HIM支架带DPI接口", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"液冷型"},
+    {id:150, kitCatalogNumber:"SK-RM-PODFAN-F7", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:151, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"固件10.001及以上"},
+    {id:152, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board", descriptionCN:"控制舱背板电路板", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:153, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board", descriptionCN:"光纤收发电路板", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:154, kitCatalogNumber:"20-750-MCPOD3-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply", descriptionCN:"控制舱总成, 再生制动驱动和总线电源", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:155, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 240V电源分配保险丝(FH2)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"15A保险丝"},
+    {id:156, kitCatalogNumber:"20-750-MACPC1-CD-F7M", kitCatalogNumberXT:"", description:"400V/480V, AC Precharge Control Circuit Board (XT)", descriptionCN:"400V/480V, 交流预充电控制电路板(XT版)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:157, kitCatalogNumber:"SK-RM-IBFH4-FUSE5A-F7", kitCatalogNumberXT:"", description:"400V/480V/600V Control Transformer Fuses (FH4)", descriptionCN:"400V/480V/600V控制变压器保险丝(FH4)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"两个17.5A保险丝"},
+    {id:158, kitCatalogNumber:"SK-RM-IBFH3-FUSE3B-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"400V/480V/600V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"2A保险丝"},
+    {id:159, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"30A保险丝"},
+    {id:160, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:161, kitCatalogNumber:"20-750-MACP-CD-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 400V/480V", descriptionCN:"交流预充电TVSS模块, 400V/480V", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:162, kitCatalogNumber:"20-750-MI5-C650D650", kitCatalogNumberXT:"", description:"Frame 7L Power Module", descriptionCN:"Frame 7L功率模块", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:"腐蚀气氛等级G3级,请咨询工厂"},
+    {id:163, kitCatalogNumber:"20-750-ML4-C585D617", kitCatalogNumberXT:"", description:"LCL Filter Module (XT)", descriptionCN:"LCL滤波模块(XT版)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:164, kitCatalogNumber:"SK-RM-CSB-F7", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board (XT)", descriptionCN:"LCL滤波模块电流检测电路板(XT版)", category:"PF755TR", frameSize:"7L", enclosureType:"", notes:""},
+    {id:165, kitCatalogNumber:"SK-RM-PBFAN-54FLTR1", kitCatalogNumberXT:"", description:"IP54 Exhaust Vent Filters", descriptionCN:"IP54排气通风过滤器", category:"PF755TL", frameSize:"7", enclosureType:"IP54", notes:"每套2个过滤器, Frame 7需要2套(4个)"},
+    {id:166, kitCatalogNumber:"SK-RM-PBFAN-54FLTR1", kitCatalogNumberXT:"", description:"IP54 Exhaust Vent Filters", descriptionCN:"IP54排气通风过滤器", category:"PF755TR", frameSize:"7", enclosureType:"IP54", notes:"每套2个过滤器, Frame 7需要2套(4个)"},
+    {id:167, kitCatalogNumber:"SK-RM-PBFAN-54FLTR1", kitCatalogNumberXT:"", description:"IP54 Exhaust Vent Filters", descriptionCN:"IP54排气通风过滤器", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"IP54", notes:"每套2个过滤器, Frame 7需要2套(4个)"},
+    {id:168, kitCatalogNumber:"SK-RM-PB8DR-54FLTR1", kitCatalogNumberXT:"", description:"IP54, 800mm Wide Door Vent Filters", descriptionCN:"IP54, 800mm宽门通风过滤器", category:"PF755TL", frameSize:"7", enclosureType:"IP54", notes:""},
+    {id:169, kitCatalogNumber:"SK-RM-PB8DR-54FLTR1", kitCatalogNumberXT:"", description:"IP54, 800mm Wide Door Vent Filters", descriptionCN:"IP54, 800mm宽门通风过滤器", category:"PF755TR", frameSize:"7", enclosureType:"IP54", notes:""},
+    {id:170, kitCatalogNumber:"SK-RM-PB8DR-54FLTR1", kitCatalogNumberXT:"", description:"IP54, 800mm Wide Door Vent Filters", descriptionCN:"IP54, 800mm宽门通风过滤器", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"IP54", notes:""},
+    {id:171, kitCatalogNumber:"SK-RM-PB8DR-21FLTR1", kitCatalogNumberXT:"", description:"IP21, 800mm Wide Door Vent Filters", descriptionCN:"IP21, 800mm宽门通风过滤器", category:"PF755TL", frameSize:"7", enclosureType:"IP21", notes:""},
+    {id:172, kitCatalogNumber:"SK-RM-PB8DR-21FLTR1", kitCatalogNumberXT:"", description:"IP21, 800mm Wide Door Vent Filters", descriptionCN:"IP21, 800mm宽门通风过滤器", category:"PF755TR", frameSize:"7", enclosureType:"IP21", notes:""},
+    {id:173, kitCatalogNumber:"SK-RM-PB8DR-21FLTR1", kitCatalogNumberXT:"", description:"IP21, 800mm Wide Door Vent Filters", descriptionCN:"IP21, 800mm宽门通风过滤器", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"IP21", notes:""},
+    {id:174, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector", descriptionCN:"控制舱HIM支架带DPI接口", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:175, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector", descriptionCN:"控制舱HIM支架带DPI接口", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:176, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector", descriptionCN:"控制舱HIM支架带DPI接口", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:177, kitCatalogNumber:"SK-RM-PODFAN-F7", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:178, kitCatalogNumber:"SK-RM-PODFAN-F7", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:179, kitCatalogNumber:"SK-RM-PODFAN-F7", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:180, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"固件10.001及以上"},
+    {id:181, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"固件10.001及以上"},
+    {id:182, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board", descriptionCN:"主控电路板", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"固件10.001及以上"},
+    {id:183, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board", descriptionCN:"控制舱背板电路板", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:184, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board", descriptionCN:"控制舱背板电路板", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:185, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board", descriptionCN:"控制舱背板电路板", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:186, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board", descriptionCN:"光纤收发电路板", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:187, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board", descriptionCN:"光纤收发电路板", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:188, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board", descriptionCN:"光纤收发电路板", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:189, kitCatalogNumber:"20-750-MCPOD3-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply", descriptionCN:"控制舱总成, 再生制动驱动和总线电源", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:190, kitCatalogNumber:"20-750-MCPOD3-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply", descriptionCN:"控制舱总成, 再生制动驱动和总线电源", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:191, kitCatalogNumber:"20-750-MCPOD3-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply", descriptionCN:"控制舱总成, 再生制动驱动和总线电源", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:192, kitCatalogNumber:"20-750-MCPOD4-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive", descriptionCN:"控制舱总成, 低谐波驱动", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:193, kitCatalogNumber:"20-750-MCPOD4-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive", descriptionCN:"控制舱总成, 低谐波驱动", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:194, kitCatalogNumber:"20-750-MCPOD4-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive", descriptionCN:"控制舱总成, 低谐波驱动", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:195, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:196, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:197, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:198, kitCatalogNumber:"20-750-MCPOD1-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:199, kitCatalogNumber:"20-750-MCPOD1-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:200, kitCatalogNumber:"20-750-MCPOD1-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:201, kitCatalogNumber:"20-750-MCPOD2-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:202, kitCatalogNumber:"20-750-MCPOD2-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:203, kitCatalogNumber:"20-750-MCPOD2-F7M", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"固件6.xxx及更早版本"},
+    {id:204, kitCatalogNumber:"SK-RM-MFAN-F7", kitCatalogNumberXT:"", description:"LCL Filter and Power Module Heatsink Fan Assembly", descriptionCN:"LCL滤波和功率模块散热风扇组件", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:205, kitCatalogNumber:"SK-RM-MFAN-F7", kitCatalogNumberXT:"", description:"LCL Filter and Power Module Heatsink Fan Assembly", descriptionCN:"LCL滤波和功率模块散热风扇组件", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:206, kitCatalogNumber:"SK-RM-MFAN-F7", kitCatalogNumberXT:"", description:"LCL Filter and Power Module Heatsink Fan Assembly", descriptionCN:"LCL滤波和功率模块散热风扇组件", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:207, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 240V电源分配保险丝(FH2)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"15A保险丝额定值"},
+    {id:208, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 240V电源分配保险丝(FH2)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"15A保险丝额定值"},
+    {id:209, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 240V电源分配保险丝(FH2)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"15A保险丝额定值"},
+    {id:210, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 240V电源分配保险丝(FH2)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"16A保险丝额定值"},
+    {id:211, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 240V电源分配保险丝(FH2)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"16A保险丝额定值"},
+    {id:212, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 240V电源分配保险丝(FH2)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"16A保险丝额定值"},
+    {id:213, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:214, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:215, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:216, kitCatalogNumber:"20-750-MACPC1-CD-F7M", kitCatalogNumberXT:"", description:"400V/480V, AC Precharge Control Circuit Board (XT)", descriptionCN:"400V/480V, 交流预充电控制电路板(XT版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:217, kitCatalogNumber:"20-750-MACPC1-CD-F7M", kitCatalogNumberXT:"", description:"400V/480V, AC Precharge Control Circuit Board (XT)", descriptionCN:"400V/480V, 交流预充电控制电路板(XT版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:218, kitCatalogNumber:"20-750-MACPC1-CD-F7M", kitCatalogNumberXT:"", description:"400V/480V, AC Precharge Control Circuit Board (XT)", descriptionCN:"400V/480V, 交流预充电控制电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:219, kitCatalogNumber:"20-750-MACPC1-EF-F7M", kitCatalogNumberXT:"", description:"600V/690V, AC Precharge Control Circuit Board (XT)", descriptionCN:"600V/690V, 交流预充电控制电路板(XT版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:220, kitCatalogNumber:"20-750-MACPC1-EF-F7M", kitCatalogNumberXT:"", description:"600V/690V, AC Precharge Control Circuit Board (XT)", descriptionCN:"600V/690V, 交流预充电控制电路板(XT版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:221, kitCatalogNumber:"20-750-MACPC1-EF-F7M", kitCatalogNumberXT:"", description:"600V/690V, AC Precharge Control Circuit Board (XT)", descriptionCN:"600V/690V, 交流预充电控制电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:222, kitCatalogNumber:"SK-RM-IBFH3-FUSE3B-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"400V/480V/600V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:223, kitCatalogNumber:"SK-RM-IBFH3-FUSE3B-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"400V/480V/600V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:224, kitCatalogNumber:"SK-RM-IBFH3-FUSE3B-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"400V/480V/600V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:225, kitCatalogNumber:"SK-RM-IBFH3-FUSE3A-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"690V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:226, kitCatalogNumber:"SK-RM-IBFH3-FUSE3A-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"690V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:227, kitCatalogNumber:"SK-RM-IBFH3-FUSE3A-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Control Circuit Board Fuse (FH3)", descriptionCN:"690V, 交流预充电控制电路板保险丝(FH3)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"2A保险丝"},
+    {id:228, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"30A保险丝"},
+    {id:229, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"30A保险丝"},
+    {id:230, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"30A保险丝"},
+    {id:231, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:"32A保险丝"},
+    {id:232, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:"32A保险丝"},
+    {id:233, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:"32A保险丝"},
+    {id:234, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:235, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:236, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:237, kitCatalogNumber:"20-750-MACP-CD-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 400V/480V", descriptionCN:"交流预充电TVSS模块, 400V/480V", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:238, kitCatalogNumber:"20-750-MACP-CD-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 400V/480V", descriptionCN:"交流预充电TVSS模块, 400V/480V", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:239, kitCatalogNumber:"20-750-MACP-CD-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 400V/480V", descriptionCN:"交流预充电TVSS模块, 400V/480V", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:240, kitCatalogNumber:"20-750-MACP-EF-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 600V/690V", descriptionCN:"交流预充电TVSS模块, 600V/690V", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:241, kitCatalogNumber:"20-750-MACP-EF-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 600V/690V", descriptionCN:"交流预充电TVSS模块, 600V/690V", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:242, kitCatalogNumber:"20-750-MACP-EF-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module, 600V/690V", descriptionCN:"交流预充电TVSS模块, 600V/690V", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:243, kitCatalogNumber:"SK-RM-DCFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V Power Module DC Link Fuses", descriptionCN:"400V/480V功率模块直流母线保险丝", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:244, kitCatalogNumber:"SK-RM-DCFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V Power Module DC Link Fuses", descriptionCN:"400V/480V功率模块直流母线保险丝", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:245, kitCatalogNumber:"SK-RM-DCFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V Power Module DC Link Fuses", descriptionCN:"400V/480V功率模块直流母线保险丝", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:246, kitCatalogNumber:"SK-RM-DCFUSE2-F8", kitCatalogNumberXT:"", description:"600V/690V Power Module DC Link Fuses", descriptionCN:"600V/690V功率模块直流母线保险丝", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:247, kitCatalogNumber:"SK-RM-DCFUSE2-F8", kitCatalogNumberXT:"", description:"600V/690V Power Module DC Link Fuses", descriptionCN:"600V/690V功率模块直流母线保险丝", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:248, kitCatalogNumber:"SK-RM-DCFUSE2-F8", kitCatalogNumberXT:"", description:"600V/690V Power Module DC Link Fuses", descriptionCN:"600V/690V功率模块直流母线保险丝", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:249, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:250, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:251, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:252, kitCatalogNumber:"SK-RM-ACFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V LCL Filter Module AC Input Fuses", descriptionCN:"400V/480V LCL滤波模块交流输入保险丝", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:253, kitCatalogNumber:"SK-RM-ACFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V LCL Filter Module AC Input Fuses", descriptionCN:"400V/480V LCL滤波模块交流输入保险丝", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:254, kitCatalogNumber:"SK-RM-ACFUSE1-F8", kitCatalogNumberXT:"", description:"400V/480V LCL Filter Module AC Input Fuses", descriptionCN:"400V/480V LCL滤波模块交流输入保险丝", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:255, kitCatalogNumber:"SK-RM-ACFUSE5-F8", kitCatalogNumberXT:"", description:"600V/690V LCL Filter Module AC Input Fuses", descriptionCN:"600V/690V LCL滤波模块交流输入保险丝", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:256, kitCatalogNumber:"SK-RM-ACFUSE5-F8", kitCatalogNumberXT:"", description:"600V/690V LCL Filter Module AC Input Fuses", descriptionCN:"600V/690V LCL滤波模块交流输入保险丝", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:257, kitCatalogNumber:"SK-RM-ACFUSE5-F8", kitCatalogNumberXT:"", description:"600V/690V LCL Filter Module AC Input Fuses", descriptionCN:"600V/690V LCL滤波模块交流输入保险丝", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:258, kitCatalogNumber:"SK-RM-CSB-F7", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board (XT)", descriptionCN:"LCL滤波模块电流检测电路板(XT版)", category:"PF755TL", frameSize:"7", enclosureType:"", notes:""},
+    {id:259, kitCatalogNumber:"SK-RM-CSB-F7", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board (XT)", descriptionCN:"LCL滤波模块电流检测电路板(XT版)", category:"PF755TR", frameSize:"7", enclosureType:"", notes:""},
+    {id:260, kitCatalogNumber:"SK-RM-CSB-F7", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board (XT)", descriptionCN:"LCL滤波模块电流检测电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"7", enclosureType:"", notes:""},
+    {id:261, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:262, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:263, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:264, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:265, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:266, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:267, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board (XT)", descriptionCN:"控制舱背板电路板(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:268, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board (XT)", descriptionCN:"控制舱背板电路板(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:269, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board (XT)", descriptionCN:"控制舱背板电路板(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:270, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board (XT)", descriptionCN:"光纤收发电路板(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:271, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board (XT)", descriptionCN:"光纤收发电路板(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:272, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board (XT)", descriptionCN:"光纤收发电路板(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:273, kitCatalogNumber:"SK-RM-FIBn-F8", kitCatalogNumberXT:"", description:"Control Pod Fiber Interface Circuit Board", descriptionCN:"控制舱光纤接口电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:274, kitCatalogNumber:"SK-RM-FIBn-F8", kitCatalogNumberXT:"", description:"Control Pod Fiber Interface Circuit Board", descriptionCN:"控制舱光纤接口电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:275, kitCatalogNumber:"SK-RM-FIBn-F8", kitCatalogNumberXT:"", description:"Control Pod Fiber Interface Circuit Board", descriptionCN:"控制舱光纤接口电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:276, kitCatalogNumber:"SK-RM-PODFAN1-F8", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:277, kitCatalogNumber:"SK-RM-PODFAN1-F8", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:278, kitCatalogNumber:"SK-RM-PODFAN1-F8", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:279, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:280, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:281, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:282, kitCatalogNumber:"20-750-MCPOD1-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:283, kitCatalogNumber:"20-750-MCPOD1-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:284, kitCatalogNumber:"20-750-MCPOD1-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:285, kitCatalogNumber:"20-750-MCPOD2-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:286, kitCatalogNumber:"20-750-MCPOD2-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:287, kitCatalogNumber:"20-750-MCPOD2-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:288, kitCatalogNumber:"20-750-MCPOD3-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (XT)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:289, kitCatalogNumber:"20-750-MCPOD3-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (XT)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:290, kitCatalogNumber:"20-750-MCPOD3-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (XT)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:291, kitCatalogNumber:"20-750-MCPOD4-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (XT)", descriptionCN:"控制舱总成, 低谐波驱动(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:292, kitCatalogNumber:"20-750-MCPOD4-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (XT)", descriptionCN:"控制舱总成, 低谐波驱动(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:293, kitCatalogNumber:"20-750-MCPOD4-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (XT)", descriptionCN:"控制舱总成, 低谐波驱动(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:294, kitCatalogNumber:"SK-RM-IBFAN1-F8", kitCatalogNumberXT:"", description:"IP21/IP54 Roof Vent Fan", descriptionCN:"IP21/IP54顶棚通风风扇", category:"PF755TL", frameSize:"8,9,10", enclosureType:"IP21/IP54", notes:""},
+    {id:295, kitCatalogNumber:"SK-RM-IBFAN1-F8", kitCatalogNumberXT:"", description:"IP21/IP54 Roof Vent Fan", descriptionCN:"IP21/IP54顶棚通风风扇", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP21/IP54", notes:""},
+    {id:296, kitCatalogNumber:"SK-RM-IBFAN1-F8", kitCatalogNumberXT:"", description:"IP21/IP54 Roof Vent Fan", descriptionCN:"IP21/IP54顶棚通风风扇", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP21/IP54", notes:""},
+    {id:297, kitCatalogNumber:"20-750-MACPC1-xx", kitCatalogNumberXT:"", description:"AC Precharge Control Circuit Board (XT)", descriptionCN:"交流预充电控制电路板(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:298, kitCatalogNumber:"20-750-MACPC1-xx", kitCatalogNumberXT:"", description:"AC Precharge Control Circuit Board (XT)", descriptionCN:"交流预充电控制电路板(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:299, kitCatalogNumber:"20-750-MACPC1-xx", kitCatalogNumberXT:"", description:"AC Precharge Control Circuit Board (XT)", descriptionCN:"交流预充电控制电路板(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:300, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:301, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:302, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:303, kitCatalogNumber:"20-750-MACP-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module", descriptionCN:"交流预充电TVSS模块", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:304, kitCatalogNumber:"20-750-MACP-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module", descriptionCN:"交流预充电TVSS模块", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:305, kitCatalogNumber:"20-750-MACP-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module", descriptionCN:"交流预充电TVSS模块", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:306, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:"15A保险丝"},
+    {id:307, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"15A保险丝"},
+    {id:308, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"15A保险丝"},
+    {id:309, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:"16A保险丝"},
+    {id:310, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"16A保险丝"},
+    {id:311, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"16A保险丝"},
+    {id:312, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:"30A保险丝"},
+    {id:313, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"30A保险丝"},
+    {id:314, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"30A保险丝"},
+    {id:315, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:"32A保险丝"},
+    {id:316, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"32A保险丝"},
+    {id:317, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"32A保险丝"},
+    {id:318, kitCatalogNumber:"SK-RM-PBFAN1-F8", kitCatalogNumberXT:"", description:"IP54 Roof Vent Fan", descriptionCN:"IP54顶棚通风风扇", category:"PF755TL", frameSize:"8,9,10", enclosureType:"IP54", notes:""},
+    {id:319, kitCatalogNumber:"SK-RM-PBFAN1-F8", kitCatalogNumberXT:"", description:"IP54 Roof Vent Fan", descriptionCN:"IP54顶棚通风风扇", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP54", notes:""},
+    {id:320, kitCatalogNumber:"SK-RM-PBFAN1-F8", kitCatalogNumberXT:"", description:"IP54 Roof Vent Fan", descriptionCN:"IP54顶棚通风风扇", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP54", notes:""},
+    {id:321, kitCatalogNumber:"SK-RM-INVFAN1-F8", kitCatalogNumberXT:"", description:"Power Module Heatsink Fan Assembly", descriptionCN:"功率模块散热风扇组件", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:322, kitCatalogNumber:"SK-RM-INVFAN1-F8", kitCatalogNumberXT:"", description:"Power Module Heatsink Fan Assembly", descriptionCN:"功率模块散热风扇组件", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:323, kitCatalogNumber:"SK-RM-INVFAN1-F8", kitCatalogNumberXT:"", description:"Power Module Heatsink Fan Assembly", descriptionCN:"功率模块散热风扇组件", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:324, kitCatalogNumber:"SK-RM-INVBRn-F8M", kitCatalogNumberXT:"", description:"Power Module Balance Resistors", descriptionCN:"功率模块平衡电阻", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:325, kitCatalogNumber:"SK-RM-INVBRn-F8M", kitCatalogNumberXT:"", description:"Power Module Balance Resistors", descriptionCN:"功率模块平衡电阻", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:326, kitCatalogNumber:"SK-RM-INVBRn-F8M", kitCatalogNumberXT:"", description:"Power Module Balance Resistors", descriptionCN:"功率模块平衡电阻", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:327, kitCatalogNumber:"SK-RM-ICP1-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module DC Bus Capacitors", descriptionCN:"功率模块直流母线电容", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:328, kitCatalogNumber:"SK-RM-ICP1-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module DC Bus Capacitors", descriptionCN:"功率模块直流母线电容", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:329, kitCatalogNumber:"SK-RM-ICP1-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module DC Bus Capacitors", descriptionCN:"功率模块直流母线电容", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:330, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:331, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:332, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:333, kitCatalogNumber:"SK-RM-PIBn-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:334, kitCatalogNumber:"SK-RM-PIBn-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:335, kitCatalogNumber:"SK-RM-PIBn-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:336, kitCatalogNumber:"SK-RM-PIB4-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:337, kitCatalogNumber:"SK-RM-PIB4-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:338, kitCatalogNumber:"SK-RM-PIB4-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:339, kitCatalogNumber:"SK-RM-LCLCPn-F8M", kitCatalogNumberXT:"", description:"LCL Filter Module Capacitors", descriptionCN:"LCL滤波模块电容", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:340, kitCatalogNumber:"SK-RM-LCLCPn-F8M", kitCatalogNumberXT:"", description:"LCL Filter Module Capacitors", descriptionCN:"LCL滤波模块电容", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:341, kitCatalogNumber:"SK-RM-LCLCPn-F8M", kitCatalogNumberXT:"", description:"LCL Filter Module Capacitors", descriptionCN:"LCL滤波模块电容", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:342, kitCatalogNumber:"SK-RM-CSB1-nnn", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board", descriptionCN:"LCL滤波模块电流检测电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:343, kitCatalogNumber:"SK-RM-CSB1-nnn", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board", descriptionCN:"LCL滤波模块电流检测电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:344, kitCatalogNumber:"SK-RM-CSB1-nnn", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board", descriptionCN:"LCL滤波模块电流检测电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:345, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:346, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:347, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:348, kitCatalogNumber:"SK-RM-DCPC1-xx", kitCatalogNumberXT:"", description:"DC Precharge Circuit Board", descriptionCN:"直流预充电电路板", category:"PF755TL", frameSize:"8,9,10", enclosureType:"", notes:""},
+    {id:349, kitCatalogNumber:"SK-RM-DCPC1-xx", kitCatalogNumberXT:"", description:"DC Precharge Circuit Board", descriptionCN:"直流预充电电路板", category:"PF755TR", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:350, kitCatalogNumber:"SK-RM-DCPC1-xx", kitCatalogNumberXT:"", description:"DC Precharge Circuit Board", descriptionCN:"直流预充电电路板", category:"PF755TM-CBI", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:351, kitCatalogNumber:"SK-RM-GRAPP1", kitCatalogNumberXT:"", description:"Dielectric Grease Applicator Kit", descriptionCN:"介电油脂涂抹工具套件", category:"其他", frameSize:"All", enclosureType:"", notes:"用于涂抹介电油脂"},
+    {id:352, kitCatalogNumber:"SK-RM-FTR1-F8-XT", kitCatalogNumberXT:"", description:"Fiber Transceiver with XT", descriptionCN:"光纤收发器(XT版)", category:"其他", frameSize:"7L,8,9,10,11,12,13,14,15", enclosureType:"", notes:"带有介电油脂的光纤收发器"},
+    {id:353, kitCatalogNumber:"20-750-MFOC-nxn", kitCatalogNumberXT:"", description:"Fiber-optic Cables", descriptionCN:"光纤电缆", category:"其他", frameSize:"7L,8,9,10,11,12,13,14,15", enclosureType:"", notes:""}
+,
+    {id:354, kitCatalogNumber:"SK-RM-CR1", kitCatalogNumberXT:"", description:"Control Pod HIM Cradle with DPI Connector (XT)", descriptionCN:"控制舱HIM支架带DPI接口(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:355, kitCatalogNumber:"SK-RM-MCB2-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (XT)", descriptionCN:"主控电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:356, kitCatalogNumber:"SK-RM-PODBP1", kitCatalogNumberXT:"", description:"Control Pod Backplane Circuit Board (XT)", descriptionCN:"控制舱背板电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:357, kitCatalogNumber:"20-750-MFTB1-F8", kitCatalogNumberXT:"", description:"Fiber Transceiver Circuit Board (XT)", descriptionCN:"光纤收发电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:358, kitCatalogNumber:"SK-RM-FIBn-F8", kitCatalogNumberXT:"", description:"Control Pod Fiber Interface Circuit Board", descriptionCN:"控制舱光纤接口电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:359, kitCatalogNumber:"SK-RM-PODFAN1-F8", kitCatalogNumberXT:"", description:"Control Pod Printed Circuit Board Fan Assembly", descriptionCN:"控制舱PCB风扇组件", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:360, kitCatalogNumber:"SK-RM-MCB1-PF755", kitCatalogNumberXT:"", description:"Main Control Circuit Board (Standard)", descriptionCN:"主控电路板(标准版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:361, kitCatalogNumber:"20-750-MCPOD1-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (Standard)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(标准版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:362, kitCatalogNumber:"20-750-MCPOD2-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (Standard)", descriptionCN:"控制舱总成, 低谐波驱动(标准版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:363, kitCatalogNumber:"20-750-MCPOD3-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Regenerative Drive and Bus Supply (XT)", descriptionCN:"控制舱总成, 再生制动驱动和总线电源(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:364, kitCatalogNumber:"20-750-MCPOD4-FnM", kitCatalogNumberXT:"", description:"Control Pod Assembly, Low Harmonic Drive (XT)", descriptionCN:"控制舱总成, 低谐波驱动(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:365, kitCatalogNumber:"SK-RM-IBFAN1-F8", kitCatalogNumberXT:"", description:"IP21/IP54 Roof Vent Fan", descriptionCN:"IP21/IP54顶棚通风风扇", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP21/IP54", notes:""},
+    {id:366, kitCatalogNumber:"20-750-MACPC1-xx", kitCatalogNumberXT:"", description:"AC Precharge Control Circuit Board (XT)", descriptionCN:"交流预充电控制电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:367, kitCatalogNumber:"20-750-MACPC-TDR", kitCatalogNumberXT:"", description:"AC Precharge Time Delay Relay", descriptionCN:"交流预充电延时继电器", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:368, kitCatalogNumber:"20-750-MACP-TVSS", kitCatalogNumberXT:"", description:"AC Precharge TVSS Module", descriptionCN:"交流预充电TVSS模块", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:369, kitCatalogNumber:"SK-RM-IBFH2-FUSE2A-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"400V/480V/600V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"15A保险丝"},
+    {id:370, kitCatalogNumber:"SK-RM-IBFH2-FUSE2B-F8", kitCatalogNumberXT:"", description:"690V, Input Bay 240V Power Distribution Fuse (FH2)", descriptionCN:"690V, 输入柜240V电源分配保险丝(FH2)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"16A保险丝"},
+    {id:371, kitCatalogNumber:"SK-RM-IBD-FUSEA-F8", kitCatalogNumberXT:"", description:"400V/480V/600V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"400V/480V/600V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"30A保险丝"},
+    {id:372, kitCatalogNumber:"SK-RM-IBD-FUSEB-F8", kitCatalogNumberXT:"", description:"690V, AC Precharge Fused Disconnect (FD1) Fuses", descriptionCN:"690V, 交流预充电熔断器隔离开关保险丝(FD1)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:"32A保险丝"},
+    {id:373, kitCatalogNumber:"SK-RM-PBFAN1-F8", kitCatalogNumberXT:"", description:"IP54 Roof Vent Fan", descriptionCN:"IP54顶棚通风风扇", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"IP54", notes:""},
+    {id:374, kitCatalogNumber:"SK-RM-INVFAN1-F8", kitCatalogNumberXT:"", description:"Power Module Heatsink Fan Assembly", descriptionCN:"功率模块散热风扇组件", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:375, kitCatalogNumber:"SK-RM-INVBRn-F8M", kitCatalogNumberXT:"", description:"Power Module Balance Resistors", descriptionCN:"功率模块平衡电阻", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:376, kitCatalogNumber:"SK-RM-ICP1-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module DC Bus Capacitors", descriptionCN:"功率模块直流母线电容", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:377, kitCatalogNumber:"SK-RM-PLI1-F8", kitCatalogNumberXT:"", description:"Power Module Power Layer Interface Circuit Board (XT)", descriptionCN:"功率模块功率层接口电路板(XT版)", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:378, kitCatalogNumber:"SK-RM-PIBn-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:379, kitCatalogNumber:"SK-RM-PIB4-xnnnxnnn", kitCatalogNumberXT:"", description:"Power Module Power Interface Circuit Board", descriptionCN:"功率模块功率接口电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:380, kitCatalogNumber:"SK-RM-LCLCPn-F8M", kitCatalogNumberXT:"", description:"LCL Filter Module Capacitors", descriptionCN:"LCL滤波模块电容", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:381, kitCatalogNumber:"SK-RM-CSB1-nnn", kitCatalogNumberXT:"", description:"LCL Filter Module Current Sense Circuit Board", descriptionCN:"LCL滤波模块电流检测电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:382, kitCatalogNumber:"SK-RM-EMCFB1", kitCatalogNumberXT:"", description:"AC Common Mode Filter Circuit Board", descriptionCN:"交流共模滤波电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""},
+    {id:383, kitCatalogNumber:"SK-RM-DCPC1-xx", kitCatalogNumberXT:"", description:"DC Precharge Circuit Board", descriptionCN:"直流预充电电路板", category:"PF755TM-BusSupply", frameSize:"8,9,10,11,12,13,14,15", enclosureType:"", notes:""}
+];
+
+// 状态管理
+let currentData = [...allKits];
+let filteredData = [...allKits];
+let currentCategory = 'all';
+let currentFrame = 'all';
+let searchTerm = '';
+let currentPage = 1;
+let pageSize = 100;
+let sortColumn = 'id';
+let sortDirection = 'asc';
+let kitImages = {}; // 存储备件图片
+let currentImageKitId = null;
+let userModifiedData = {}; // 用户修改的数据
+let isLoggedIn = false; // 管理员登录状态
+
+// 初始化
+document.addEventListener('DOMContentLoaded', function() {
+    loadFromStorage();
+    updateStats();
+    updateFrameFilters();
+    setupEventListeners();
+    renderTable();
+});
+
+// 从localStorage加载数据
+function loadFromStorage() {
+    const savedImages = localStorage.getItem('pf755_kit_images');
+    if (savedImages) {
+        kitImages = JSON.parse(savedImages);
+    }
+    
+    const savedModifications = localStorage.getItem('pf755_kit_modifications');
+    if (savedModifications) {
+        try {
+            userModifiedData = JSON.parse(savedModifications);
+            // 应用用户修改
+            Object.keys(userModifiedData).forEach(id => {
+                const kitIndex = allKits.findIndex(k => k.id === parseInt(id));
+                if (kitIndex !== -1) {
+                    allKits[kitIndex] = { ...allKits[kitIndex], ...userModifiedData[id] };
+                }
+            });
+        } catch(e) {
+            // localStorage数据损坏，清除
+            localStorage.removeItem('pf755_kit_modifications');
+            userModifiedData = {};
+        }
+    }
+    currentData = [...allKits];
+    filteredData = [...allKits];
+    // 保护机制：如果所有数据都被标记删除，清除脏数据恢复
+    const deletedCount = allKits.filter(k => k._deleted).length;
+    if (deletedCount === allKits.length && allKits.length > 0) {
+        console.warn('检测到所有备件被标记删除，正在恢复原始数据...');
+        localStorage.removeItem('pf755_kit_modifications');
+        localStorage.removeItem('pf755_kit_images');
+        location.reload();
+    }
+}
+
+// 保存到localStorage
+function saveToStorage() {
+    localStorage.setItem('pf755_kit_images', JSON.stringify(kitImages));
+    localStorage.setItem('pf755_kit_modifications', JSON.stringify(userModifiedData));
+}
+
+// 更新统计信息
+function updateStats() {
+    document.getElementById('total-count').textContent = allKits.length;
+    document.getElementById('count-all').textContent = allKits.length;
+    document.getElementById('count-PF755TS').textContent = allKits.filter(k => k.category === 'PF755TS').length;
+    document.getElementById('count-PF755TL').textContent = allKits.filter(k => k.category === 'PF755TL').length;
+    document.getElementById('count-PF755TR').textContent = allKits.filter(k => k.category === 'PF755TR').length;
+    // PF755TM total = CBI + BusSupply
+    document.getElementById('count-PF755TM').textContent = allKits.filter(k => k.category.startsWith('PF755TM')).length;
+    const cbiCount = allKits.filter(k => k.category === 'PF755TM-CBI').length;
+    const bsCount = allKits.filter(k => k.category === 'PF755TM-BusSupply').length;
+    document.getElementById('count-PF755TM-CBI').textContent = cbiCount;
+    document.getElementById('count-PF755TM-BusSupply').textContent = bsCount;
+    document.getElementById('count-其他').textContent = allKits.filter(k => k.category === '其他').length;
+}
+
+// 更新Frame筛选器 - 折叠树形结构（含PF755TM两级子菜单）
+function updateFrameFilters() {
+    // 一级分类（不含PF755TM特殊处理）
+    const simpleCategories = ['PF755TS', 'PF755TL', 'PF755TR', '其他'];
+    
+    simpleCategories.forEach(cat => {
+        const frames = new Set();
+        allKits.filter(k => k.category === cat).forEach(kit => {
+            kit.frameSize.split(',').forEach(f => {
+                const trimmed = f.trim();
+                if (trimmed && trimmed !== 'All') {
+                    frames.add(trimmed);
+                }
+            });
+        });
+        
+        const sortedFrames = Array.from(frames).sort((a, b) => {
+            const aNum = parseInt(a), bNum = parseInt(b);
+            if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+            return a.localeCompare(b);
+        });
+        
+        const container = document.getElementById('children-' + cat);
+        if (!container) return;
+        
+        let html = `<div class="frame-sub-item ${currentCategory === cat && currentFrame === 'all' ? 'active' : ''}" 
+                        data-category="${cat}" data-frame="all">全部Frame</div>`;
+        sortedFrames.forEach(f => {
+            html += `<div class="frame-sub-item ${currentCategory === cat && currentFrame === f ? 'active' : ''}" 
+                          data-category="${cat}" data-frame="${f}">Frame ${f}</div>`;
+        });
+        container.innerHTML = html;
+        
+        // 绑定Frame子项点击
+        container.querySelectorAll('.frame-sub-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                currentCategory = this.dataset.category;
+                currentFrame = this.dataset.frame;
+                document.querySelectorAll('.sidebar-item[data-category]').forEach(i => i.classList.remove('active'));
+                document.querySelector(`.sidebar-item[data-category="${currentCategory}"]`).classList.add('active');
+                updateFrameFilters();
+                applyFilters();
+            });
+        });
+        
+        if (currentCategory === cat) {
+            container.classList.add('open');
+            const arrow = container.parentElement.querySelector(':scope > .category-toggle .toggle-arrow');
+            if (arrow) arrow.classList.add('rotated');
+        }
+    });
+    
+    // PF755TM 特殊处理 - 两级子菜单
+    ['PF755TM-CBI', 'PF755TM-BusSupply'].forEach(tmCat => {
+        const frames = new Set();
+        allKits.filter(k => k.category === tmCat).forEach(kit => {
+            kit.frameSize.split(',').forEach(f => {
+                const trimmed = f.trim();
+                if (trimmed && trimmed !== 'All') {
+                    frames.add(trimmed);
+                }
+            });
+        });
+        
+        const sortedFrames = Array.from(frames).sort((a, b) => {
+            const aNum = parseInt(a), bNum = parseInt(b);
+            if (!isNaN(aNum) && !isNaN(bNum)) return aNum - bNum;
+            return a.localeCompare(b);
+        });
+        
+        const container = document.getElementById('children-' + tmCat);
+        if (!container) return;
+        
+        let html = `<div class="level2-frame-item ${currentCategory === tmCat && currentFrame === 'all' ? 'active' : ''}" 
+                        data-category="${tmCat}" data-frame="all">全部Frame</div>`;
+        sortedFrames.forEach(f => {
+            html += `<div class="level2-frame-item ${currentCategory === tmCat && currentFrame === f ? 'active' : ''}" 
+                          data-category="${tmCat}" data-frame="${f}">Frame ${f}</div>`;
+        });
+        container.innerHTML = html;
+        
+        // 绑定二级Frame子项点击
+        container.querySelectorAll('.level2-frame-item').forEach(item => {
+            item.addEventListener('click', function(e) {
+                e.stopPropagation();
+                currentCategory = this.dataset.category;
+                currentFrame = this.dataset.frame;
+                // 高亮PF755TM大类和当前子分类
+                document.querySelectorAll('.sidebar-item[data-category]').forEach(i => i.classList.remove('active'));
+                document.querySelector('.sidebar-item[data-category="PF755TM"]').classList.add('active');
+                document.querySelectorAll('.category-toggle-level2').forEach(i => i.classList.remove('active'));
+                document.querySelector(`.category-toggle-level2[data-category="${currentCategory}"]`).classList.add('active');
+                updateFrameFilters();
+                applyFilters();
+            });
+        });
+        
+        // 展开当前选中的TM子分类
+        if (currentCategory === tmCat) {
+            container.classList.add('open');
+            const l2toggle = document.querySelector(`.category-toggle-level2[data-category="${tmCat}"]`);
+            if (l2toggle) {
+                l2toggle.classList.add('active');
+                const arrow = l2toggle.querySelector('.toggle-arrow');
+                if (arrow) arrow.classList.add('rotated');
+            }
+            // 也展开PF755TM一级
+            const tmChildren = document.getElementById('children-PF755TM');
+            if (tmChildren) tmChildren.classList.add('open');
+            const tmArrow = document.querySelector('.category-group[data-group="PF755TM"] > .category-toggle .toggle-arrow');
+            if (tmArrow) tmArrow.classList.add('rotated');
+        }
+    });
+    
+    // 如果选中PF755TM大类本身
+    if (currentCategory === 'PF755TM') {
+        const tmChildren = document.getElementById('children-PF755TM');
+        if (tmChildren) tmChildren.classList.add('open');
+        const tmArrow = document.querySelector('.category-group[data-group="PF755TM"] > .category-toggle .toggle-arrow');
+        if (tmArrow) tmArrow.classList.add('rotated');
+    }
+}
+
+// 设置事件监听
+function setupEventListeners() {
+    // 搜索输入
+    document.getElementById('search-input').addEventListener('input', debounce(function(e) {
+        searchTerm = e ? e.target.value : this.value;
+        applyFilters();
+    }, 300));
+    
+    // 分类导航 - 支持折叠展开
+    document.querySelectorAll('.sidebar-item[data-category]').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.preventDefault();
+            const cat = this.dataset.category;
+            
+            if (cat === 'all') {
+                document.querySelectorAll('.sidebar-item[data-category]').forEach(i => i.classList.remove('active'));
+                this.classList.add('active');
+                currentCategory = 'all';
+                currentFrame = 'all';
+                document.querySelectorAll('.category-children').forEach(c => c.classList.remove('open'));
+                document.querySelectorAll('.toggle-arrow').forEach(a => a.classList.remove('rotated'));
+                document.querySelectorAll('.category-toggle-level2').forEach(i => i.classList.remove('active'));
+                updateFrameFilters();
+                applyFilters();
+                return;
+            }
+            
+            // 切换active状态
+            document.querySelectorAll('.sidebar-item[data-category]').forEach(i => i.classList.remove('active'));
+            this.classList.add('active');
+            currentCategory = cat;
+            currentFrame = 'all';
+            
+            // 折叠/展开子菜单
+            const children = document.getElementById('children-' + cat);
+            const arrow = this.querySelector('.toggle-arrow');
+            
+            if (children && children.classList.contains('open')) {
+                // 已展开 → 再次点击收起
+                children.classList.remove('open');
+                if (arrow) arrow.classList.remove('rotated');
+                // 同时收起二级
+                children.querySelectorAll('.level2-children').forEach(c => c.classList.remove('open'));
+                children.querySelectorAll('.toggle-arrow').forEach(a => a.classList.remove('rotated'));
+                children.querySelectorAll('.category-toggle-level2').forEach(i => i.classList.remove('active'));
+            } else {
+                // 收起其他分类
+                document.querySelectorAll('.category-children').forEach(c => c.classList.remove('open'));
+                document.querySelectorAll('.toggle-arrow').forEach(a => a.classList.remove('rotated'));
+                document.querySelectorAll('.category-toggle-level2').forEach(i => i.classList.remove('active'));
+                // 展开当前分类
+                if (children) {
+                    children.classList.add('open');
+                    if (arrow) arrow.classList.add('rotated');
+                }
+            }
+            
+            updateFrameFilters();
+            applyFilters();
+        });
+    });
+    
+    // PF755TM 二级子分类点击（Common Bus Inverters / Bus Supply）
+    document.querySelectorAll('.category-toggle-level2').forEach(item => {
+        item.addEventListener('click', function(e) {
+            e.stopPropagation();
+            const cat = this.dataset.category;
+            const children = document.getElementById('children-' + cat);
+            const arrow = this.querySelector('.toggle-arrow');
+            
+            if (this.classList.contains('active') && children && children.classList.contains('open')) {
+                // 已展开 → 收起
+                this.classList.remove('active');
+                if (children) children.classList.remove('open');
+                if (arrow) arrow.classList.remove('rotated');
+            } else {
+                // 收起其他二级
+                document.querySelectorAll('.category-toggle-level2').forEach(i => i.classList.remove('active'));
+                document.querySelectorAll('.level2-children').forEach(c => c.classList.remove('open'));
+                document.querySelectorAll('.category-toggle-level2 .toggle-arrow').forEach(a => a.classList.remove('rotated'));
+                // 展开当前
+                this.classList.add('active');
+                if (children) children.classList.add('open');
+                if (arrow) arrow.classList.add('rotated');
+                currentCategory = cat;
+                currentFrame = 'all';
+                // 高亮PF755TM大类
+                document.querySelectorAll('.sidebar-item[data-category]').forEach(i => i.classList.remove('active'));
+                document.querySelector('.sidebar-item[data-category="PF755TM"]').classList.add('active');
+                updateFrameFilters();
+                applyFilters();
+            }
+        });
+    });
+    
+    // 编辑表单
+    document.getElementById('edit-form').addEventListener('submit', function(e) {
+        e.preventDefault();
+        saveKit();
+    });
+}
+
+// 防抖函数
+function debounce(func, wait) {
+    let timeout;
+    return function executedFunction(...args) {
+        const context = this;
+        const later = () => {
+            clearTimeout(timeout);
+            func.apply(context, args);
+        };
+        clearTimeout(timeout);
+        timeout = setTimeout(later, wait);
+    };
+}
+
+// 应用筛选
+function applyFilters() {
+    filteredData = currentData.filter(kit => {
+        // 分类筛选
+        if (currentCategory !== 'all') {
+            if (currentCategory === 'PF755TM') {
+                // PF755TM大类显示所有TM子分类
+                if (!kit.category.startsWith('PF755TM')) return false;
+            } else if (currentCategory === 'PF755TM-CBI' || currentCategory === 'PF755TM-BusSupply') {
+                // TM二级子分类精确匹配
+                if (kit.category !== currentCategory) return false;
+            } else if (currentCategory === 'PF755TL') {
+                if (kit.category !== 'PF755TL') return false;
+            } else if (kit.category !== currentCategory) {
+                return false;
+            }
+        }
+        
+        // Frame筛选
+        if (currentFrame !== 'all') {
+            const frames = kit.frameSize.split(',').map(f => f.trim());
+            if (!frames.includes(currentFrame) && kit.frameSize !== 'All') {
+                return false;
+            }
+        }
+        
+        // 搜索筛选
+        if (searchTerm) {
+            const term = searchTerm.toLowerCase();
+            const matchCatalog = kit.kitCatalogNumber.toLowerCase().includes(term) ||
+                               kit.kitCatalogNumberXT.toLowerCase().includes(term);
+            const matchDesc = kit.description.toLowerCase().includes(term) ||
+                             kit.descriptionCN.toLowerCase().includes(term);
+            if (!matchCatalog && !matchDesc) {
+                return false;
+            }
+        }
+        
+        return true;
+    });
+    
+    // 排序
+    sortData();
+    
+    // 重置页码
+    currentPage = 1;
+    
+    // 更新显示
+    updateCurrentFilter();
+    renderTable();
+    renderPagination();
+}
+
+// 更新当前筛选显示
+function updateCurrentFilter() {
+    const categoryNames = {
+        'all': '全部',
+        'PF755TS': 'PF755TS',
+        'PF755TL': 'PF755TL',
+        'PF755TR': 'PF755TR',
+        'PF755TM': 'PF755TM',
+        '其他': '其他'
+    };
+    
+    let filterText = categoryNames[currentCategory] || '全部';
+    if (currentFrame !== 'all') {
+        filterText += ` / Frame ${currentFrame}`;
+    }
+    if (searchTerm) {
+        filterText += ` / 搜索: "${searchTerm}"`;
+    }
+    
+    document.getElementById('current-filter').textContent = filterText;
+    document.getElementById('displayed-count').textContent = Math.min(pageSize, filteredData.length);
+    document.getElementById('filtered-count').textContent = filteredData.length;
+}
+
+// 排序数据
+function sortData() {
+    filteredData.sort((a, b) => {
+        let aVal = a[sortColumn] || '';
+        let bVal = b[sortColumn] || '';
+        
+        if (typeof aVal === 'string') {
+            aVal = aVal.toLowerCase();
+            bVal = bVal.toLowerCase();
+        }
+        
+        if (aVal < bVal) return sortDirection === 'asc' ? -1 : 1;
+        if (aVal > bVal) return sortDirection === 'asc' ? 1 : -1;
+        return 0;
+    });
+}
+
+// 排序表格
+function sortTable(column) {
+    if (sortColumn === column) {
+        sortDirection = sortDirection === 'asc' ? 'desc' : 'asc';
+    } else {
+        sortColumn = column;
+        sortDirection = 'asc';
+    }
+    
+    // 更新排序图标
+    document.querySelectorAll('.sort-icon').forEach(icon => icon.classList.remove('active'));
+    const activeIcon = document.getElementById(`sort-${column}`);
+    if (activeIcon) {
+        activeIcon.classList.add('active');
+        activeIcon.className = `fas fa-sort-${sortDirection === 'asc' ? 'up' : 'down'} sort-icon active`;
+    }
+    
+    applyFilters();
+}
+
+// 渲染表格
+function renderTable() {
+    const tbody = document.getElementById('table-body');
+    const start = (currentPage - 1) * pageSize;
+    const end = start + pageSize;
+    const pageData = filteredData.slice(start, end);
+    
+    tbody.innerHTML = pageData.map(kit => `
+        <tr class="border-b border-gray-100 hover:bg-gray-50">
+            <td class="px-3 py-2 text-sm">${kit.id}</td>
+            <td class="px-3 py-2 text-sm font-medium text-blue-600 editable-cell" 
+                onclick="editCell(${kit.id}, 'kitCatalogNumber', this)">${kit.kitCatalogNumber || '-'}</td>
+            <td class="px-3 py-2 text-sm font-medium text-purple-600 editable-cell"
+                onclick="editCell(${kit.id}, 'kitCatalogNumberXT', this)">${kit.kitCatalogNumberXT || '-'}</td>
+            <td class="px-3 py-2 text-sm editable-cell" onclick="isLoggedIn&&editCell(${kit.id}, 'descriptionCN', this)">${kit.descriptionCN}</td>
+            <td class="px-3 py-2 text-sm text-gray-600 editable-cell" onclick="editCell(${kit.id}, 'description', this)">${kit.description}</td>
+            <td class="px-3 py-2">
+                <div class="flex flex-wrap">
+                    ${kit.frameSize.split(',').map(f => `<span class="frame-tag">${f.trim()}</span>`).join('')}
+                </div>
+            </td>
+            <td class="px-3 py-2 text-sm text-gray-500 editable-cell" onclick="editCell(${kit.id}, 'enclosureType', this)">${kit.enclosureType || '-'}</td>
+            <td class="px-3 py-2">${getCategoryBadge(kit.category)}</td>
+            <td class="px-3 py-2 text-sm text-gray-500 editable-cell" onclick="editCell(${kit.id}, 'notes', this)">${kit.notes || '-'}</td>
+            <td class="px-3 py-2 text-center">
+                ${kitImages[kit.id] ? 
+                    `<img src="${kitImages[kit.id]}" class="thumbnail" onclick="openImageModal(${kit.id})">` : 
+                    (isLoggedIn ? `<button onclick="uploadImage(${kit.id})" class="text-gray-400 hover:text-blue-600">
+                        <i class="fas fa-image"></i>
+                    </button>` : '<span class="text-xs text-gray-400"><i class="fas fa-image"></i></span>')
+                }
+            </td>
+            <td class="px-3 py-2 text-center">
+                ${isLoggedIn ? `
+                <button onclick="editKit(${kit.id})" class="text-blue-600 hover:text-blue-800 mr-2" title="编辑">
+                    <i class="fas fa-edit"></i>
+                </button>
+                <button onclick="deleteKit(${kit.id})" class="text-red-600 hover:text-red-800" title="删除">
+                    <i class="fas fa-trash"></i>
+                </button>
+                ` : '<span class="text-xs text-gray-400">需登录</span>'}
+            </td>
+        </tr>
+    `).join('');
+    
+    document.getElementById('displayed-count').textContent = Math.min(pageSize, filteredData.length);
+    document.getElementById('filtered-count').textContent = filteredData.length;
+}
+
+// 获取分类徽章
+function getCategoryBadge(category) {
+    const badgeClasses = {
+        'PF755TS': 'badge-ts',
+        'PF755TL': 'badge-tltr',
+        'PF755TR': 'badge-tr',
+        'PF755TM': 'badge-tltm',
+        'PF755TM-CBI': 'badge-tltm',
+        'PF755TM-BusSupply': 'badge-tltm',
+        '其他': 'badge-other'
+    };
+    const displayNames = {
+        'PF755TM-CBI': 'TM-CBI',
+        'PF755TM-BusSupply': 'TM-BusSupply'
+    };
+    const display = displayNames[category] || category;
+    return `<span class="category-badge ${badgeClasses[category] || 'badge-other'}">${display}</span>`;
+}
+
+// 渲染分页
+function renderPagination() {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    const pagination = document.getElementById('pagination');
+    
+    if (totalPages <= 1) {
+        pagination.innerHTML = '';
+        return;
+    }
+    
+    let html = '';
+    
+    // 上一页
+    html += `<button class="pagination-btn ${currentPage === 1 ? 'bg-gray-100 text-gray-400' : 'bg-white border border-gray-300'}" 
+                    onclick="goToPage(${currentPage - 1})" ${currentPage === 1 ? 'disabled' : ''}>
+                <i class="fas fa-chevron-left"></i>
+            </button>`;
+    
+    // 页码
+    const maxVisible = 5;
+    let startPage = Math.max(1, currentPage - Math.floor(maxVisible / 2));
+    let endPage = Math.min(totalPages, startPage + maxVisible - 1);
+    
+    if (endPage - startPage < maxVisible - 1) {
+        startPage = Math.max(1, endPage - maxVisible + 1);
+    }
+    
+    if (startPage > 1) {
+        html += `<button class="pagination-btn bg-white border border-gray-300" onclick="goToPage(1)">1</button>`;
+        if (startPage > 2) {
+            html += `<span class="px-2">...</span>`;
+        }
+    }
+    
+    for (let i = startPage; i <= endPage; i++) {
+        html += `<button class="pagination-btn ${i === currentPage ? 'active' : 'bg-white border border-gray-300'}" 
+                        onclick="goToPage(${i})">${i}</button>`;
+    }
+    
+    if (endPage < totalPages) {
+        if (endPage < totalPages - 1) {
+            html += `<span class="px-2">...</span>`;
+        }
+        html += `<button class="pagination-btn bg-white border border-gray-300" onclick="goToPage(${totalPages})">${totalPages}</button>`;
+    }
+    
+    // 下一页
+    html += `<button class="pagination-btn ${currentPage === totalPages ? 'bg-gray-100 text-gray-400' : 'bg-white border border-gray-300'}" 
+                    onclick="goToPage(${currentPage + 1})" ${currentPage === totalPages ? 'disabled' : ''}>
+                <i class="fas fa-chevron-right"></i>
+            </button>`;
+    
+    pagination.innerHTML = html;
+}
+
+// 跳转到指定页
+function goToPage(page) {
+    const totalPages = Math.ceil(filteredData.length / pageSize);
+    if (page < 1 || page > totalPages) return;
+    currentPage = page;
+    renderTable();
+    renderPagination();
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+// 更改每页显示数量
+function changePageSize() {
+    pageSize = parseInt(document.getElementById('page-size').value);
+    currentPage = 1;
+    renderTable();
+    renderPagination();
+}
+
+// 清除搜索
+function clearSearch() {
+    document.getElementById('search-input').value = '';
+    searchTerm = '';
+    applyFilters();
+}
+
+// 打开批量查询模态框
+function openBatchModal() {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    document.getElementById('batch-modal').classList.remove('hidden');
+}
+
+// 关闭批量查询模态框
+function closeBatchModal() {
+    document.getElementById('batch-modal').classList.add('hidden');
+    document.getElementById('batch-input').value = '';
+}
+
+// 执行批量查询
+function performBatchSearch() {
+    const input = document.getElementById('batch-input').value;
+    const terms = input.split(/[,\n]/).map(t => t.trim()).filter(t => t);
+    
+    if (terms.length === 0) {
+        showToast('请输入要查询的目录号或名称', 'error');
+        return;
+    }
+    
+    // 使用第一个匹配项进行搜索
+    const searchTerm = terms.join('|');
+    document.getElementById('search-input').value = terms.join(', ');
+    document.getElementById('search-input').dispatchEvent(new Event('input'));
+    
+    closeBatchModal();
+    showToast(`找到 ${filteredData.length} 条匹配记录`, 'success');
+}
+
+// 打开导入模态框
+function openImportModal() {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    document.getElementById('import-modal').classList.remove('hidden');
+}
+
+// 关闭导入模态框
+function closeImportModal() {
+    document.getElementById('import-modal').classList.add('hidden');
+    document.getElementById('import-file').value = '';
+}
+
+// 导入数据
+function importData() {
+    const fileInput = document.getElementById('import-file');
+    const file = fileInput.files[0];
+    
+    if (!file) {
+        showToast('请选择要导入的文件', 'error');
+        return;
+    }
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        try {
+            const data = new Uint8Array(e.target.result);
+            const workbook = XLSX.read(data, { type: 'array' });
+            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+            const jsonData = XLSX.utils.sheet_to_json(firstSheet);
+            
+            if (jsonData.length > 0) {
+                // 合并导入的数据
+                jsonData.forEach(row => {
+                    const id = parseInt(row['序号'] || row['id']);
+                    if (id) {
+                        const kitIndex = allKits.findIndex(k => k.id === id);
+                        if (kitIndex !== -1) {
+                            Object.keys(row).forEach(key => {
+                                const fieldMap = {
+                                    '目录号(标准)': 'kitCatalogNumber',
+                                    '目录号(XT版)': 'kitCatalogNumberXT',
+                                    '中文名称': 'descriptionCN',
+                                    '英文名称': 'description',
+                                    '适用Frame': 'frameSize',
+                                    '外壳类型': 'enclosureType',
+                                    '分类': 'category',
+                                    '备注': 'notes'
+                                };
+                                if (fieldMap[key]) {
+                                    allKits[kitIndex][fieldMap[key]] = row[key] || '';
+                                    userModifiedData[id] = userModifiedData[id] || {};
+                                    userModifiedData[id][fieldMap[key]] = row[key] || '';
+                                }
+                            });
+                        }
+                    }
+                });
+                
+                saveToStorage();
+                currentData = [...allKits];
+                applyFilters();
+                showToast(`成功导入 ${jsonData.length} 条记录`, 'success');
+            }
+        } catch (error) {
+            showToast('导入失败: ' + error.message, 'error');
+        }
+    };
+    reader.readAsArrayBuffer(file);
+    closeImportModal();
+}
+
+// 导出筛选后的数据
+function exportFilteredData() {
+    const exportData = filteredData.map((kit, index) => ({
+        '序号': index + 1,
+        '目录号(标准)': kit.kitCatalogNumber,
+        '目录号(XT版)': kit.kitCatalogNumberXT,
+        '中文名称': kit.descriptionCN,
+        '英文名称': kit.description,
+        '适用Frame': kit.frameSize,
+        '外壳类型': kit.enclosureType,
+        '分类': kit.category,
+        '备注': kit.notes
+    }));
+    
+    const worksheet = XLSX.utils.json_to_sheet(exportData);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, "备件列表");
+    
+    // 设置列宽
+    worksheet['!cols'] = [
+        { wch: 6 },   // 序号
+        { wch: 25 },  // 目录号(标准)
+        { wch: 25 },  // 目录号(XT版)
+        { wch: 40 },  // 中文名称
+        { wch: 60 },  // 英文名称
+        { wch: 12 },  // 适用Frame
+        { wch: 30 },  // 外壳类型
+        { wch: 20 },  // 分类
+        { wch: 30 }   // 备注
+    ];
+    
+    const fileName = `PowerFlex755_备件列表_${new Date().toISOString().slice(0,10)}.xlsx`;
+    XLSX.writeFile(workbook, fileName);
+    showToast(`已导出 ${filteredData.length} 条记录`, 'success');
+}
+
+// 编辑单元格
+function editCell(id, field, element) {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    const kit = allKits.find(k => k.id === id);
+    if (!kit) return;
+    
+    const currentValue = kit[field] || '';
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = currentValue;
+    input.className = 'border border-blue-500 rounded px-2 py-1 text-sm w-full';
+    input.onblur = function() {
+        saveCellEdit(id, field, this.value);
+    };
+    input.onkeydown = function(e) {
+        if (e.key === 'Enter') {
+            this.blur();
+        } else if (e.key === 'Escape') {
+            renderTable();
+        }
+    };
+    
+    element.innerHTML = '';
+    element.appendChild(input);
+    input.focus();
+    input.select();
+}
+
+// 保存单元格编辑
+function saveCellEdit(id, field, value) {
+    const kitIndex = allKits.findIndex(k => k.id === id);
+    if (kitIndex === -1) return;
+    
+    allKits[kitIndex][field] = value;
+    userModifiedData[id] = userModifiedData[id] || {};
+    userModifiedData[id][field] = value;
+    saveToStorage();
+    currentData = [...allKits];
+    applyFilters();
+    showToast('已保存修改', 'success');
+}
+
+// 打开编辑模态框
+function editKit(id) {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    const kit = allKits.find(k => k.id === id);
+    if (!kit) return;
+    
+    document.getElementById('edit-modal-title').textContent = '编辑备件';
+    document.getElementById('edit-id').value = kit.id;
+    document.getElementById('edit-catalognumber').value = kit.kitCatalogNumber;
+    document.getElementById('edit-catalognumberxt').value = kit.kitCatalogNumberXT;
+    document.getElementById('edit-description').value = kit.description;
+    document.getElementById('edit-descriptioncn').value = kit.descriptionCN;
+    document.getElementById('edit-category').value = kit.category;
+    document.getElementById('edit-framesize').value = kit.frameSize;
+    document.getElementById('edit-enclosuretype').value = kit.enclosureType;
+    document.getElementById('edit-notes').value = kit.notes || '';
+    
+    document.getElementById('edit-modal').classList.remove('hidden');
+}
+
+// 关闭编辑模态框
+function closeEditModal() {
+    document.getElementById('edit-modal').classList.add('hidden');
+}
+
+// 保存备件
+function saveKit() {
+    const id = parseInt(document.getElementById('edit-id').value);
+    const kitIndex = allKits.findIndex(k => k.id === id);
+    if (kitIndex === -1) return;
+    
+    allKits[kitIndex] = {
+        ...allKits[kitIndex],
+        kitCatalogNumber: document.getElementById('edit-catalognumber').value,
+        kitCatalogNumberXT: document.getElementById('edit-catalognumberxt').value,
+        description: document.getElementById('edit-description').value,
+        descriptionCN: document.getElementById('edit-descriptioncn').value,
+        category: document.getElementById('edit-category').value,
+        frameSize: document.getElementById('edit-framesize').value,
+        enclosureType: document.getElementById('edit-enclosuretype').value,
+        notes: document.getElementById('edit-notes').value
+    };
+    
+    userModifiedData[id] = { ...allKits[kitIndex] };
+    saveToStorage();
+    currentData = [...allKits];
+    applyFilters();
+    updateStats();
+    updateFrameFilters();
+    closeEditModal();
+    showToast('已保存修改', 'success');
+}
+
+// 删除备件
+function deleteKit(id) {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    if (!confirm('确定要删除这条备件记录吗？')) return;
+    
+    // 从allKits中删除（实际上只是标记）
+    const kitIndex = allKits.findIndex(k => k.id === id);
+    if (kitIndex !== -1) {
+        allKits[kitIndex]._deleted = true;
+        userModifiedData[id] = userModifiedData[id] || {};
+        userModifiedData[id]._deleted = true;
+        saveToStorage();
+        currentData = [...allKits.filter(k => !k._deleted)];
+        applyFilters();
+        showToast('已删除记录', 'success');
+    }
+}
+
+// 上传图片
+function uploadImage(id) {
+    if (!isLoggedIn) { showToast('请先登录管理员账号', 'error'); openLoginModal(); return; }
+    currentImageKitId = id;
+    document.getElementById('image-upload').click();
+}
+
+// 处理图片上传
+function handleImageUpload(event) {
+    const file = event.target.files[0];
+    if (!file) return;
+    
+    const reader = new FileReader();
+    reader.onload = function(e) {
+        kitImages[currentImageKitId] = e.target.result;
+        saveToStorage();
+        renderTable();
+        showToast('图片已上传', 'success');
+    };
+    reader.readAsDataURL(file);
+}
+
+// 打开图片查看模态框
+function openImageModal(id) {
+    currentImageKitId = id;
+    const kit = allKits.find(k => k.id === id);
+    document.getElementById('image-modal-title').textContent = `${kit.kitCatalogNumber || kit.id} - 备件图片`;
+    document.getElementById('modal-image').src = kitImages[id];
+    document.getElementById('image-modal').classList.remove('hidden');
+}
+
+// 关闭图片模态框
+function closeImageModal() {
+    document.getElementById('image-modal').classList.add('hidden');
+}
+
+// 替换图片
+function replaceImage() {
+    document.getElementById('image-upload').click();
+}
+
+// 删除图片
+function deleteImage() {
+    if (!confirm('确定要删除这张图片吗？')) return;
+    delete kitImages[currentImageKitId];
+    saveToStorage();
+    closeImageModal();
+    renderTable();
+    showToast('图片已删除', 'success');
+}
+
+// 显示Toast提示
+function showToast(message, type) {
+    const toast = document.getElementById('toast');
+    toast.textContent = message;
+    toast.className = `toast ${type === 'success' ? 'bg-green-500' : 'bg-red-500'}`;
+    toast.classList.remove('hidden');
+    setTimeout(() => {
+        toast.classList.add('hidden');
+    }, 3000);
+}
+
+    // ===== 拖拽调节侧边栏宽度 =====
+    (function() {
+        const handle = document.getElementById('resizeHandle');
+        const sidebar = document.querySelector('.sidebar');
+        const mainContent = document.querySelector('.main-content');
+        let isResizing = false;
+        let startX = 0;
+        let startWidth = 0;
+        
+        handle.addEventListener('mousedown', function(e) {
+            isResizing = true;
+            startX = e.clientX;
+            startWidth = sidebar.offsetWidth;
+            handle.classList.add('active');
+            document.body.style.cursor = 'col-resize';
+            document.body.style.userSelect = 'none';
+            e.preventDefault();
+        });
+        
+        document.addEventListener('mousemove', function(e) {
+            if (!isResizing) return;
+            const dx = e.clientX - startX;
+            let newWidth = startWidth + dx;
+            // 限制最小/最大宽度
+            newWidth = Math.max(180, Math.min(420, newWidth));
+            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+        });
+        
+        document.addEventListener('mouseup', function() {
+            if (isResizing) {
+                isResizing = false;
+                handle.classList.remove('active');
+                document.body.style.cursor = '';
+                document.body.style.userSelect = '';
+                // 保存宽度到 localStorage
+                localStorage.setItem('sidebarWidth', sidebar.offsetWidth + 'px');
+            }
+        });
+        
+        // 触摸支持
+        handle.addEventListener('touchstart', function(e) {
+            isResizing = true;
+            startX = e.touches[0].clientX;
+            startWidth = sidebar.offsetWidth;
+            handle.classList.add('active');
+            e.preventDefault();
+        }, {passive: false});
+        
+        document.addEventListener('touchmove', function(e) {
+            if (!isResizing) return;
+            const dx = e.touches[0].clientX - startX;
+            let newWidth = startWidth + dx;
+            newWidth = Math.max(180, Math.min(420, newWidth));
+            document.documentElement.style.setProperty('--sidebar-width', newWidth + 'px');
+        }, {passive: false});
+        
+        document.addEventListener('touchend', function() {
+            if (isResizing) {
+                isResizing = false;
+                handle.classList.remove('active');
+                localStorage.setItem('sidebarWidth', sidebar.offsetWidth + 'px');
+            }
+        });
+        
+        // 页面加载时恢复保存的宽度
+        const savedWidth = localStorage.getItem('sidebarWidth');
+        if (savedWidth) {
+            document.documentElement.style.setProperty('--sidebar-width', savedWidth);
+        }
+    })();
+    
+    // ===== 移动端侧边栏切换 =====
+    function toggleMobileSidebar() {
+        const sidebar = document.querySelector('.sidebar');
+        const overlay = document.getElementById('mobileOverlay');
+        sidebar.classList.toggle('open');
+        overlay.classList.toggle('active');
+    }
+
+    
+    // ===== 管理员登录系统 =====
+    const ADMIN_USER = 'admin';
+    const ADMIN_PASS = 'admin';
+    
+    function handleAuthClick() {
+        if (isLoggedIn) {
+            doLogout();
+        } else {
+            openLoginModal();
+        }
+    }
+    
+    function openLoginModal() {
+        document.getElementById('login-modal').classList.remove('hidden');
+        document.getElementById('login-username').value = '';
+        document.getElementById('login-password').value = '';
+        document.getElementById('login-error').classList.add('hidden');
+        setTimeout(() => document.getElementById('login-username').focus(), 100);
+    }
+    
+    function closeLoginModal() {
+        document.getElementById('login-modal').classList.add('hidden');
+    }
+    
+    function doLogin() {
+        const username = document.getElementById('login-username').value.trim();
+        const password = document.getElementById('login-password').value;
+        if (username === ADMIN_USER && password === ADMIN_PASS) {
+            isLoggedIn = true;
+            localStorage.setItem('pf755_auth', 'logged_in');
+            closeLoginModal();
+            updateAuthUI();
+            showToast('登录成功，已获得编辑权限', 'success');
+        } else {
+            document.getElementById('login-error').classList.remove('hidden');
+        }
+    }
+    
+    function doLogout() {
+        isLoggedIn = false;
+        localStorage.setItem('pf755_auth', '');
+        updateAuthUI();
+        showToast('已退出登录', 'info');
+    }
+    
+    function updateAuthUI() {
+        const btn = document.getElementById('auth-btn');
+        const icon = document.getElementById('auth-icon');
+        const text = document.getElementById('auth-text');
+        
+        if (isLoggedIn) {
+            btn.className = 'auth-btn logged-in w-full px-3 py-2 rounded-lg text-sm flex items-center justify-center gap-2 text-white';
+            icon.className = 'fas fa-unlock';
+            text.textContent = '退出登录';
+        } else {
+            btn.className = 'auth-btn logged-out w-full px-3 py-2 rounded-lg text-sm flex items-center justify-center gap-2 text-white';
+            icon.className = 'fas fa-lock';
+            text.textContent = '管理员登录';
+        }
+        
+        // 更新操作按钮状态
+        const editBtns = document.querySelectorAll('.btn-auth-required');
+        editBtns.forEach(b => {
+            if (isLoggedIn) {
+                b.classList.remove('btn-disabled');
+                b.disabled = false;
+            } else {
+                b.classList.add('btn-disabled');
+                b.disabled = true;
+            }
+        });
+        
+        // 重新渲染表格以更新编辑按钮状态
+        renderTable();
+    }
+    
+    function requireAuth(callback) {
+        if (isLoggedIn) {
+            callback();
+        } else {
+            showToast('请先登录管理员账号', 'error');
+            openLoginModal();
+        }
+    }
+    
+    // 页面加载时恢复登录状态
+    (function() {
+        const savedAuth = localStorage.getItem('pf755_auth');
+        if (savedAuth === 'logged_in') {
+            isLoggedIn = true;
+            updateAuthUI();
+        }
+    })();
+
+
+    // ===== 调试经验分享功能 =====
+    
+    // Tab切换
+    function switchTab(tab) {
+        const partsSection = document.getElementById('partsSection');
+        const chatSection = document.getElementById('chatSection');
+        const tabParts = document.getElementById('tab-parts');
+        const tabChat = document.getElementById('tab-chat');
+        
+        if (tab === 'parts') {
+            partsSection.style.display = 'flex';
+            chatSection.style.display = 'none';
+            tabParts.classList.add('active');
+            tabChat.classList.remove('active');
+        } else {
+            partsSection.style.display = 'none';
+            chatSection.style.display = 'flex';
+            tabParts.classList.remove('active');
+            tabChat.classList.add('active');
+        }
+    }
+    
+    // 本地关键词搜索知识库
+    function searchKB(query) {
+        if (!query || !query.trim()) return [];
+        const q = query.toLowerCase().trim();
+        const words = q.split(/\s+/);
+        const scores = [];
+        
+        for (let i = 0; i < KB.length; i++) {
+            const item = KB[i];
+            const keywords = item[2]; // keywords array
+            const question = item[3].toLowerCase();
+            const answer = item[4].toLowerCase();
+            let score = 0;
+            
+            // 关键词匹配（权重3）
+            for (const w of words) {
+                for (const kw of keywords) {
+                    if (kw.toLowerCase() === w) score += 3;
+                    else if (kw.toLowerCase().includes(w)) score += 2;
+                    else if (w.includes(kw.toLowerCase())) score += 1.5;
+                }
+            }
+            
+            // 问题匹配（权重2）
+            for (const w of words) {
+                if (question.includes(w)) score += 2;
+            }
+            
+            // 答案匹配（权重1）
+            for (const w of words) {
+                if (answer.includes(w)) score += 1;
+            }
+            
+            if (score > 0) {
+                scores.push({ index: i, score: score });
+            }
+        }
+        
+        scores.sort((a, b) => b.score - a.score);
+        return scores.slice(0, 5).map(s => KB[s.index]);
+    }
+    
+    // 发送消息
+    // 示例问题点击 - 直接显示搜索结果
+    function askExample(keyword) {
+        const chatMessages = document.getElementById('chatMessages');
+        const welcome = document.getElementById('chatWelcome');
+        if (welcome) welcome.style.display = 'none';
+        
+        // 添加用户消息
+        addChatMessage('user', keyword);
+        
+        // 搜索知识库
+        const results = searchKB(keyword);
+        
+        setTimeout(() => {
+            if (results.length === 0) {
+                addChatMessage('bot', '抱歉，在本地知识库中未找到相关内容。\n\n💡 您可以访问 <a href="https://support.rockwellautomation.com/" target="_blank" rel="noopener" style="color:#3b82f6;text-decoration:underline;">AB官方知识库</a> 获取更多技术支持，或尝试使用不同的关键词重新提问。');
+            } else {
+                let reply = '';
+                results.forEach((item, idx) => {
+                    const catCode = item[1];
+                    const catName = CAT_NAMES[catCode] || catCode;
+                    const catColors = {F:'#f59e0b',P:'#3b82f6',M:'#10b981',R:'#ec4899',G:'#8b5cf6',O:'#6b7280'};
+                    const color = catColors[catCode] || '#6b7280';
+                    
+                    if (idx > 0) reply += '\n\n---\n\n';
+                    reply += `<span style="display:inline-block;padding:2px 8px;border-radius:4px;font-size:12px;background:${color}22;color:${color};font-weight:600;margin-bottom:6px;">${catName}</span>\n\n`;
+                    reply += item[4].replace(/\n/g, '\n');
+                });
+                addChatMessage('bot', reply);
+            }
+        }, 300 + Math.random() * 400);
+    }
+    
+    // 添加聊天消息
+    function addChatMessage(role, content) {
+        const container = document.getElementById('chatMessages');
+        const div = document.createElement('div');
+        div.style.cssText = role === 'user' 
+            ? 'display:flex;justify-content:flex-end;margin-bottom:16px;'
+            : 'display:flex;justify-content:flex-start;margin-bottom:16px;';
+        
+        const bubble = document.createElement('div');
+        bubble.style.cssText = role === 'user'
+            ? 'max-width:75%;padding:12px 16px;border-radius:16px 16px 4px 16px;background:#3b82f6;color:#fff;font-size:14px;line-height:1.7;word-break:break-word;'
+            : 'max-width:80%;padding:12px 16px;border-radius:16px 16px 16px 4px;background:#fff;color:#1e293b;font-size:14px;line-height:1.7;word-break:break-word;box-shadow:0 1px 3px rgba(0,0,0,0.08);';
+        
+        if (role === 'bot') {
+            bubble.innerHTML = content;
+        } else {
+            bubble.textContent = content;
+        }
+        
+        div.appendChild(bubble);
+        container.appendChild(div);
+        container.scrollTop = container.scrollHeight;
+    }
+    
+    // 显示手册分类指南
+    function showLitGuide() {
+        // 自动切换到调试经验分享Tab
+        switchTab('chat');
+        const guide = `<div style="margin-bottom:8px;font-weight:600;font-size:15px;">📚 AB变频器常用手册分类说明</div>
+<div style="font-size:13px;color:#64748b;margin-bottom:12px;">在AB手册下载网站搜索时，手册编号中的字母代表文档类型，例如 <b>750-PM101</b> 中的 <b>PM</b> 即编程手册。</div>
+<table style="width:100%;border-collapse:collapse;font-size:13px;">
+<thead><tr style="background:linear-gradient(135deg,#0d9488,#0f766e);color:#fff;">
+<th style="padding:8px 10px;text-align:center;border-radius:6px 0 0 0;">序号</th>
+<th style="padding:8px 10px;text-align:center;">文档类型</th>
+<th style="padding:8px 10px;text-align:center;">英文全称</th>
+<th style="padding:8px 10px;text-align:center;border-radius:0 6px 0 0;">说明</th>
+</tr></thead>
+<tbody>
+<tr style="background:#f0fdfa;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">1</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">QS</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Quick Start</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">快速入门</td></tr>
+<tr style="background:#fff;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">2</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">UM</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">User Manual</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">用户手册</td></tr>
+<tr style="background:#f0fdfa;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">3</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">TD</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Technical Data</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">技术数据</td></tr>
+<tr style="background:#fff;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">4</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">SG</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Selection Guide</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">选型指南</td></tr>
+<tr style="background:#f0fdfa;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">5</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">DS</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Dimension Sheets</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">尺寸表单</td></tr>
+<tr style="background:#fff;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">6</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">RM</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Reference Manual</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">参考手册</td></tr>
+<tr style="background:#f0fdfa;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">7</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">PM</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Programming Manual</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">编程手册</td></tr>
+<tr style="background:#fff;"><td style="padding:7px 10px;text-align:center;border-bottom:1px solid #e2e8f0;">8</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;border-bottom:1px solid #e2e8f0;">TG</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">Troubleshooting Guide</td><td style="padding:7px 10px;border-bottom:1px solid #e2e8f0;">维护手册</td></tr>
+<tr style="background:#f0fdfa;"><td style="padding:7px 10px;text-align:center;">9</td><td style="padding:7px 10px;text-align:center;font-weight:700;color:#0d9488;">II</td><td style="padding:7px 10px;">Installation Instructions</td><td style="padding:7px 10px;">安装说明</td></tr>
+</tbody></table>
+<div style="margin-top:12px;font-size:12px;color:#94a3b8;">💡 示例：搜索 <b>750-TG104</b> 即可找到PowerFlex 755TL/TR/TM维护手册</div>`;
+        addChatMessage('bot', guide);
+    }
+    
+    // 初始化
+    (function() {
+        // 调试经验分享无需初始化对话历史
+    })();
+
+    </script>
+
+    <!-- 登录模态框 -->
+    <div id="login-modal" class="fixed inset-0 login-overlay hidden z-50 flex items-center justify-center">
+        <div class="bg-white rounded-xl p-6 w-full max-w-sm shadow-2xl">
+            <div class="flex justify-between items-center mb-5">
+                <h2 class="text-xl font-bold text-gray-800">
+                    <i class="fas fa-shield-alt text-blue-600 mr-2"></i>管理员登录
+                </h2>
+                <button onclick="closeLoginModal()" class="text-gray-400 hover:text-gray-600 text-xl">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="space-y-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">用户名</label>
+                    <input type="text" id="login-username" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入用户名" autocomplete="off">
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">密码</label>
+                    <input type="password" id="login-password" class="w-full border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-blue-500" placeholder="请输入密码" onkeydown="if(event.key==='Enter')doLogin()">
+                </div>
+                <div id="login-error" class="text-red-500 text-sm hidden">用户名或密码错误</div>
+                <button onclick="doLogin()" class="w-full bg-blue-600 text-white py-2 rounded-lg hover:bg-blue-700 transition font-medium">
+                    登录
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- 微信二维码弹窗 -->
+    <div id="wechatQRModal" onclick="closeWechatQR(event)" style="display:none;position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,0.5);z-index:9999;justify-content:center;align-items:center;">
+        <div onclick="event.stopPropagation()" style="background:#fff;border-radius:12px;padding:28px 24px;text-align:center;max-width:320px;width:90%;box-shadow:0 8px 32px rgba(0,0,0,0.2);">
+            <div style="width:48px;height:48px;border-radius:50%;background:#07c160;margin:0 auto 16px;display:flex;align-items:center;justify-content:center;">
+                <i class="fab fa-weixin" style="font-size:24px;color:#fff;"></i>
+            </div>
+            <h3 style="margin:0 0 8px;font-size:16px;color:#1e293b;">请在微信中打开</h3>
+            <p style="margin:0 0 16px;font-size:13px;color:#64748b;">该链接仅支持微信访问，请扫描二维码</p>
+            <div style="background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px;padding:16px;margin-bottom:16px;">
+                <img id="wechatQRImg" src="" alt="二维码" style="width:180px;height:180px;display:block;margin:0 auto;" />
+            </div>
+            <button onclick="document.getElementById('wechatQRModal').style.display='none'" style="width:100%;padding:10px;border:none;border-radius:6px;background:#07c160;color:#fff;font-size:14px;cursor:pointer;">关闭</button>
+        </div>
+    </div>
+
+    <script src="kb_data.js"></script>
+    <script>
+    function showWechatQR(){
+        var url='https://custom.cep.wanglukeji.com/Rockwell/WXSpecial2020n2/Index?channel=fission&fromOpenId=oKJoft1FP0txv61mxZScdwqW9nDI&mediaTypeId=158&code=061YQGkl2UWETh41X2ll2ye1LR3YQGkt';
+        document.getElementById('wechatQRImg').src='https://api.qrserver.com/v1/create-qr-code/?size=300x300&data='+encodeURIComponent(url);
+        document.getElementById('wechatQRModal').style.display='flex';
+    }
+    function closeWechatQR(e){
+        if(e.target===document.getElementById('wechatQRModal')){document.getElementById('wechatQRModal').style.display='none';}
+    }
+    </script>
+</body>
+</html>
